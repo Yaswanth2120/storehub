@@ -1,0 +1,9 @@
+import { LoginForm } from "@/frontend/components/forms/login-form";
+
+export default function LoginPage() {
+  return (
+    <div className="flex min-h-screen items-center justify-center px-4 py-10">
+      <LoginForm />
+    </div>
+  );
+}

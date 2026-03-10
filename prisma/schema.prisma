@@ -1,0 +1,85 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id                 String               @id @default(cuid())
+  username           String               @unique
+  password           String
+  role               String
+  mustChangePassword Boolean              @default(false)
+  recoveryEmail      String?
+  pastDaysAllowed    Int?
+  assignedStores     StoreUser[]
+  resetTokens        PasswordResetToken[]
+  createdAt          DateTime             @default(now())
+}
+
+model Store {
+  id         String       @id @default(cuid())
+  name       String
+  address    String
+  employees  Employee[]
+  users      StoreUser[]
+  attendance Attendance[]
+  createdAt  DateTime     @default(now())
+}
+
+model StoreUser {
+  id      String @id @default(cuid())
+  userId  String
+  storeId String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, storeId])
+}
+
+model Employee {
+  id         String       @id @default(cuid())
+  name       String
+  storeId    String
+  payRate    Float        @default(18)
+  status     String
+  store      Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  attendance Attendance[]
+  createdAt  DateTime     @default(now())
+}
+
+model Attendance {
+  id         String   @id @default(cuid())
+  employeeId String
+  storeId    String
+  date       DateTime
+  clockIn    String
+  clockOut   String
+  totalHours Float
+  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+
+  @@index([storeId, date])
+}
+
+model SystemSettings {
+  id            String   @id @default(cuid())
+  companyName   String
+  recoveryEmail String?
+  timezone      String   @default("America/Chicago")
+  notes         String?
+  updatedAt     DateTime @updatedAt
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
