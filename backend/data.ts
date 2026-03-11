@@ -1,4 +1,5 @@
 import { addDays, endOfDay, format, startOfDay, subDays } from "date-fns";
+import { aggregatePayrollEntries } from "@/backend/payroll";
 import { prisma } from "@/backend/prisma";
 import { parseDateOnly } from "@/lib/utils";
 
@@ -35,7 +36,13 @@ export async function getStoresForUser(user: {
       employees: true,
       users: {
         include: {
-          user: true,
+          user: {
+            select: {
+              id: true,
+              username: true,
+              role: true,
+            },
+          },
         },
       },
     },
@@ -86,7 +93,13 @@ export async function getAttendanceForUser(user: {
           },
     include: {
       employee: true,
-      user: true,
+      user: {
+        select: {
+          id: true,
+          username: true,
+          role: true,
+        },
+      },
       store: true,
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -100,7 +113,12 @@ export async function getUserManagementData() {
         in: ["CO_OWNER", "MANAGER"],
       },
     },
-    include: {
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      pastDaysAllowed: true,
+      payRate: true,
       assignedStores: {
         include: {
           store: true,
@@ -174,62 +192,19 @@ export async function getPayrollForUser(
     },
     include: {
       employee: true,
-      user: true,
+      user: {
+        select: {
+          id: true,
+          username: true,
+        },
+      },
       store: true,
     },
     orderBy: [{ date: "asc" }, { createdAt: "asc" }],
   });
 
-  const grouped = new Map<string, {
-    workerId: string;
-    workerType: "EMPLOYEE" | "MANAGER";
-    workerName: string;
-    storeId: string;
-    storeName: string;
-    payRate: number | null;
-    totalHours: number;
-    totalPay: number;
-    hasMixedRates: boolean;
-  }>();
-
-  for (const entry of entries) {
-    const isManager = Boolean(entry.userId);
-    const workerId = entry.userId ?? entry.employeeId ?? "";
-    const payRate = entry.payRateSnapshot;
-    const workerName = isManager ? entry.user?.username ?? "Unknown worker" : entry.employee?.name ?? "Unknown worker";
-    const key = `${workerId}-${entry.storeId}-${isManager ? "MANAGER" : "EMPLOYEE"}`;
-    const existing = grouped.get(key);
-
-    if (existing) {
-      existing.totalHours += entry.totalHours;
-      existing.totalPay += entry.totalHours * payRate;
-      existing.hasMixedRates = existing.hasMixedRates || existing.payRate !== payRate;
-      existing.payRate = payRate;
-      continue;
-    }
-
-    grouped.set(key, {
-      workerId,
-      workerType: isManager ? "MANAGER" : "EMPLOYEE",
-      workerName,
-      storeId: entry.storeId,
-      storeName: entry.store.name,
-      payRate,
-      totalHours: entry.totalHours,
-      totalPay: entry.totalHours * payRate,
-      hasMixedRates: false,
-    });
-  }
-
-  return Array.from(grouped.values()).map((row) => ({
-    workerId: row.workerId,
-    workerType: row.workerType,
-    workerName: row.workerName,
-    storeId: row.storeId,
-    storeName: row.storeName,
-    payRate: row.hasMixedRates ? null : row.payRate,
-    totalHours: Number(row.totalHours.toFixed(2)),
+  return aggregatePayrollEntries(entries).map((row) => ({
+    ...row,
     payPeriod: `${payPeriodStart}|${payPeriodEnd}`,
-    totalPay: Number(row.totalPay.toFixed(2)),
   }));
 }

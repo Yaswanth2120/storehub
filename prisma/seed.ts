@@ -41,7 +41,7 @@ async function main() {
       username: "coowner1",
       password: tempPassword,
       role: "CO_OWNER",
-      mustChangePassword: true,
+      mustChangePassword: false,
     },
   });
 
@@ -50,7 +50,7 @@ async function main() {
       username: "sarah.j",
       password: tempPassword,
       role: "MANAGER",
-      mustChangePassword: true,
+      mustChangePassword: false,
       pastDaysAllowed: 3,
       payRate: 21,
     },

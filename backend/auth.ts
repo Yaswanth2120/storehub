@@ -48,25 +48,19 @@ export const authOptions: AuthOptions = {
           username: user.username,
           role: user.role,
           assignedStores: user.assignedStores.map((entry) => entry.storeId),
-          mustChangePassword: user.mustChangePassword,
           pastDaysAllowed: user.pastDaysAllowed,
         };
       },
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger, session }) {
+    async jwt({ token, user }) {
       if (user) {
         token.id = user.id;
         token.username = user.username;
         token.role = user.role;
         token.assignedStores = user.assignedStores;
-        token.mustChangePassword = user.mustChangePassword;
         token.pastDaysAllowed = user.pastDaysAllowed;
-      }
-
-      if (trigger === "update" && session.user) {
-        token.mustChangePassword = session.user.mustChangePassword;
       }
 
       return token;
@@ -78,7 +72,6 @@ export const authOptions: AuthOptions = {
         username: token.username,
         role: token.role,
         assignedStores: token.assignedStores ?? [],
-        mustChangePassword: token.mustChangePassword ?? false,
         pastDaysAllowed: token.pastDaysAllowed ?? null,
       };
 

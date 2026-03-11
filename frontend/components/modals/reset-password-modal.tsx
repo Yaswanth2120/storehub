@@ -60,7 +60,7 @@ export function ResetPasswordModal({ userId }: ResetPasswordModalProps) {
             <Input readOnly value={password} />
           </div>
         ) : (
-          <p className="text-sm text-muted-foreground">This will force the user to change their password on next login.</p>
+          <p className="text-sm text-muted-foreground">Share this temporary password with the user. They can change it later from the Settings page if they want.</p>
         )}
         <DialogFooter>
           <Button type="button" onClick={handleReset} disabled={loading}>

@@ -42,7 +42,11 @@ export default async function EmployeesPage() {
                   },
                 ],
               },
-      include: {
+      select: {
+        id: true,
+        username: true,
+        role: true,
+        payRate: true,
         assignedStores: {
           include: {
             store: true,

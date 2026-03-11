@@ -21,7 +21,12 @@ export async function GET() {
         in: ["CO_OWNER", "MANAGER"],
       },
     },
-    include: {
+    select: {
+      id: true,
+      username: true,
+      role: true,
+      pastDaysAllowed: true,
+      payRate: true,
       assignedStores: {
         include: {
           store: true,
@@ -92,7 +97,7 @@ export async function POST(request: Request) {
       username: parsed.data.username,
       password,
       role,
-      mustChangePassword: true,
+      mustChangePassword: false,
       pastDaysAllowed: role === "MANAGER" ? body.pastDaysAllowed : null,
       payRate: role === "MANAGER" ? Number(body.payRate) : null,
       assignedStores: {
@@ -145,7 +150,6 @@ export async function PATCH(request: Request) {
       where: { id: user.id },
       data: {
         password: await bcrypt.hash(parsed.data.newPassword, 10),
-        mustChangePassword: false,
       },
     });
 
@@ -172,7 +176,6 @@ export async function PATCH(request: Request) {
       where: { id: resetToken.userId },
       data: {
         password: await bcrypt.hash(parsed.data.newPassword, 10),
-        mustChangePassword: false,
       },
     });
 
@@ -191,7 +194,7 @@ export async function PATCH(request: Request) {
       where: { id: body.userId },
       data: {
         password: await bcrypt.hash(nextPassword, 10),
-        mustChangePassword: true,
+        mustChangePassword: false,
       },
     });
 

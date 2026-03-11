@@ -161,7 +161,7 @@ The seed script creates:
 - Users sign in with username and password
 - Sessions are stored as JWTs with role and store assignment metadata
 - Protected routes are enforced with middleware
-- Users flagged with `mustChangePassword` are redirected to `/change-password`
+- Owners can reset their own password with username + recovery email, while co-owners/managers use owner-issued temporary passwords and can change them later from Settings
 
 ## Payroll Behavior
 

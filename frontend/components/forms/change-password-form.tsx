@@ -2,7 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -16,7 +15,6 @@ type ChangePasswordValues = z.infer<typeof changePasswordSchema>;
 
 export function ChangePasswordForm() {
   const router = useRouter();
-  const { update } = useSession();
   const [loading, setLoading] = useState(false);
   const {
     register,
@@ -40,12 +38,6 @@ export function ChangePasswordForm() {
       toast.error(data.error ?? "Password update failed");
       return;
     }
-
-    await update({
-      user: {
-        mustChangePassword: false,
-      },
-    });
 
     toast.success("Password updated");
     router.push("/stores");

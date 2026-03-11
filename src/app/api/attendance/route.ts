@@ -119,7 +119,13 @@ export async function GET() {
           },
     include: {
       employee: true,
-      user: true,
+      user: {
+        select: {
+          id: true,
+          username: true,
+          role: true,
+        },
+      },
       store: true,
     },
     orderBy: {

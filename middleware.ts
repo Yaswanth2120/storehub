@@ -10,14 +10,6 @@ export default withAuth(
       return NextResponse.redirect(new URL("/login", request.url));
     }
 
-    if (pathname !== "/change-password" && token.mustChangePassword) {
-      return NextResponse.redirect(new URL("/change-password", request.url));
-    }
-
-    if (pathname === "/change-password" && !token.mustChangePassword) {
-      return NextResponse.redirect(new URL("/stores", request.url));
-    }
-
     if (token.role === "MANAGER" && ["/users", "/payroll"].includes(pathname)) {
       return NextResponse.redirect(new URL("/stores", request.url));
     }

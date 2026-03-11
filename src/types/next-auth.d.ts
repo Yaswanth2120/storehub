@@ -7,7 +7,6 @@ declare module "next-auth" {
       username: string;
       role: string;
       assignedStores: string[];
-      mustChangePassword: boolean;
       pastDaysAllowed: number | null;
     };
   }
@@ -17,7 +16,6 @@ declare module "next-auth" {
     username: string;
     role: string;
     assignedStores: string[];
-    mustChangePassword: boolean;
     pastDaysAllowed: number | null;
   }
 }
@@ -28,7 +26,6 @@ declare module "next-auth/jwt" {
     username: string;
     role: string;
     assignedStores: string[];
-    mustChangePassword: boolean;
     pastDaysAllowed: number | null;
   }
 }
