@@ -27,12 +27,34 @@ type PayrollClientProps = {
   defaultTo: string;
 };
 
+function getPreviousSaturday() {
+  const today = new Date();
+  const day = today.getDay(); // 0 = Sunday, 6 = Saturday
+
+  const diff = day >= 6 ? day - 6 : day + 1;
+  const prevSaturday = new Date(today);
+  prevSaturday.setDate(today.getDate() - diff);
+
+  return prevSaturday.toISOString().split("T")[0];
+}
+
+function getToday() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function formatHours(hours: number) {
+  const wholeHours = Math.floor(hours);
+  const minutes = Math.round((hours - wholeHours) * 60);
+
+  return `${hours.toFixed(2)}h (${wholeHours} hrs ${minutes} min)`;
+}
+
 export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: PayrollClientProps) {
   const [rows, setRows] = useState(payroll);
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("all");
-  const [fromDate, setFromDate] = useState(defaultFrom);
-  const [toDate, setToDate] = useState(defaultTo);
+  const [fromDate, setFromDate] = useState(getPreviousSaturday());
+  const [toDate, setToDate] = useState(getToday());
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -186,7 +208,9 @@ export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: Payro
                           <td className="px-6 py-6 text-lg text-slate-600">
                             {formatDate(from)} - {formatDate(to)}
                           </td>
-                          <td className="px-6 py-6 text-lg text-slate-900">{row.totalHours.toFixed(1)}h</td>
+                          <td className="px-6 py-6 text-lg text-slate-900">
+                            {formatHours(row.totalHours)}
+                          </td>
                           <td className="px-6 py-6 text-lg text-slate-900">
                             {row.payRate == null ? "Varies" : `$${row.payRate.toFixed(2)}`}
                           </td>

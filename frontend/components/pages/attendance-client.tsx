@@ -30,12 +30,38 @@ type AttendanceClientProps = {
   }>;
 };
 
+function getPreviousSaturday() {
+  const today = new Date();
+  const day = today.getDay(); // 0 = Sun, 6 = Sat
+
+  const diff = day >= 6 ? day - 6 : day + 1;
+  const prevSaturday = new Date(today);
+  prevSaturday.setDate(today.getDate() - diff);
+
+  return prevSaturday.toISOString().split("T")[0];
+}
+
+function getToday() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function formatTime(time: string) {
+  const [hour, minute] = time.split(":").map(Number);
+
+  const period = hour >= 12 ? "PM" : "AM";
+  const hour12 = hour % 12 || 12;
+
+  return `${hour12.toString().padStart(2, "0")}:${minute
+    .toString()
+    .padStart(2, "0")} ${period}`;
+}
+
 export function AttendanceClient({ role, pastDaysAllowed, stores, workers, attendance }: AttendanceClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("all");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  const [fromDate, setFromDate] = useState(getPreviousSaturday());
+  const [toDate, setToDate] = useState(getToday());
 
   const filtered = useMemo(
     () =>
@@ -88,7 +114,7 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, workers, atten
               </SelectContent>
             </Select>
             <Input type="date" value={fromDate} onChange={(event) => setFromDate(event.target.value)} />
-            <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+            <Input type="date" value={toDate} max={getToday()} onChange={(event) => setToDate(event.target.value)} />
             <AddAttendanceModal
               triggerLabel="Add Attendance"
               stores={stores}
@@ -120,8 +146,8 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, workers, atten
                     <td className="px-4 py-3">{entry.store.name}</td>
                     <td className="px-4 py-3"><Badge variant={entry.workerType === "MANAGER" ? "default" : "outline"}>{entry.workerType === "MANAGER" ? "Manager" : "Employee"}</Badge></td>
                     <td className="px-4 py-3">{formatDate(entry.date)}</td>
-                    <td className="px-4 py-3">{entry.clockIn}</td>
-                    <td className="px-4 py-3">{entry.clockOut}</td>
+                    <td className="px-4 py-3">{formatTime(entry.clockIn)}</td>
+                    <td className="px-4 py-3">{formatTime(entry.clockOut)}</td>
                     <td className="px-4 py-3"><Badge>{entry.totalHours.toFixed(2)} hrs</Badge></td>
                     <td className="px-4 py-3">
                       {role === "MANAGER" ? (
