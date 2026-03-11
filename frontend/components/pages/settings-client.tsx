@@ -87,7 +87,7 @@ export function SettingsClient({ role, readOnly, settings }: SettingsClientProps
 
   return (
     <div className="space-y-6">
-      {role !== "MANAGER" ? (
+      {role == "OWNER" ? (
         <Card>
           <CardHeader>
             <CardTitle>Settings</CardTitle>
@@ -108,11 +108,6 @@ export function SettingsClient({ role, readOnly, settings }: SettingsClientProps
                   <Input disabled={readOnly} {...register("recoveryEmail")} />
                   {errors.recoveryEmail ? <p className="text-xs text-destructive">{errors.recoveryEmail.message}</p> : null}
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Timezone</label>
-                  <Input disabled={readOnly} {...register("timezone")} />
-                  {errors.timezone ? <p className="text-xs text-destructive">{errors.timezone.message}</p> : null}
-                </div>
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">Notes</label>
@@ -128,7 +123,7 @@ export function SettingsClient({ role, readOnly, settings }: SettingsClientProps
         <Card>
           <CardHeader>
             <CardTitle>Settings</CardTitle>
-            <p className="text-sm text-muted-foreground">Managers can update their own password here. Company settings remain restricted.</p>
+            {role=="MANAGER" ? (<p className="text-sm text-muted-foreground"> Manager's can update their own password here. Company settings remain restricted.</p>):  (<p className="text-sm text-muted-foreground"> Co-Owner's can update their own password here. Company settings remain restricted.</p>) }
           </CardHeader>
         </Card>
       )}

@@ -11,19 +11,32 @@ export async function GET() {
 
 export async function PATCH(request: Request) {
   await requireRole(["OWNER"]);
+
   const body = await request.json();
   const parsed = settingsSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message },
+      { status: 400 }
+    );
   }
 
   const settings = await getSettings();
 
+  // Update SystemSettings
   await prisma.systemSettings.update({
     where: { id: settings.id },
     data: parsed.data,
   });
+
+  // ALSO update Owner user recovery email
+  if (parsed.data.recoveryEmail) {
+    await prisma.user.updateMany({
+      where: { role: "OWNER" },
+      data: { recoveryEmail: parsed.data.recoveryEmail },
+    });
+  }
 
   return NextResponse.json({ success: true });
 }
