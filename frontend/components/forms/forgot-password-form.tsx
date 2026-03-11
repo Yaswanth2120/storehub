@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
@@ -14,8 +15,8 @@ import { forgotPasswordSchema } from "@/backend/validations";
 type ForgotPasswordValues = z.infer<typeof forgotPasswordSchema>;
 
 export function ForgotPasswordForm() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState<string | null>(null);
   const {
     register,
     handleSubmit,
@@ -39,15 +40,15 @@ export function ForgotPasswordForm() {
       return;
     }
 
-    setSuccess(data.message);
-    toast.success("Recovery email queued");
+    toast.success("Recovery email verified");
+    router.push(data.redirectTo);
   });
 
   return (
     <Card className="w-full max-w-md">
       <CardHeader>
         <CardTitle>Forgot password</CardTitle>
-        <CardDescription>Only the Owner account can receive a recovery link.</CardDescription>
+        <CardDescription>Only the Owner can reset a forgotten password with username and recovery email.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
         <form className="space-y-4" onSubmit={onSubmit}>
@@ -56,11 +57,18 @@ export function ForgotPasswordForm() {
             <Input placeholder="Enter the owner username" {...register("username")} />
             {errors.username ? <p className="text-xs text-destructive">{errors.username.message}</p> : null}
           </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">Recovery email</label>
+            <Input placeholder="Enter the recovery email" {...register("recoveryEmail")} />
+            {errors.recoveryEmail ? <p className="text-xs text-destructive">{errors.recoveryEmail.message}</p> : null}
+          </div>
           <Button type="submit" disabled={loading} className="w-full">
-            {loading ? "Submitting..." : "Send reset link"}
+            {loading ? "Verifying..." : "Verify and continue"}
           </Button>
         </form>
-        {success ? <div className="rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700">{success}</div> : null}
+        <div className="rounded-xl border bg-slate-50 p-4 text-sm text-muted-foreground">
+          Managers and Co-Owners still need an Owner-issued temporary password if they forget theirs.
+        </div>
         <Link href="/login" className="block text-sm font-medium text-primary hover:underline">
           Back to login
         </Link>

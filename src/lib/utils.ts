@@ -2,6 +2,8 @@ import { clsx, type ClassValue } from "clsx";
 import { differenceInMinutes, format, parseISO } from "date-fns";
 import { twMerge } from "tailwind-merge";
 
+const DATE_ONLY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
@@ -22,8 +24,18 @@ export function calculateHours(clockIn: string, clockOut: string) {
   return Number((minutes / 60).toFixed(2));
 }
 
+export function isDateOnlyString(value: string) {
+  return DATE_ONLY_PATTERN.test(value);
+}
+
+export function parseDateOnly(value: string) {
+  const [year, month, day] = value.split("-").map(Number);
+  return new Date(year, month - 1, day);
+}
+
 export function formatDate(date: Date | string, dateFormat = "MMM d, yyyy") {
-  const value = typeof date === "string" ? new Date(date) : date;
+  const value =
+    typeof date === "string" ? (isDateOnlyString(date) ? parseDateOnly(date) : new Date(date)) : date;
   return format(value, dateFormat);
 }
 

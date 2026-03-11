@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AddEmployeeModal } from "@/frontend/components/modals/add-employee-modal";
+import { ChangePayRateModal } from "@/frontend/components/modals/change-pay-rate-modal";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
@@ -22,6 +23,11 @@ type EmployeesClientProps = {
     storeIds: string[];
     storeNames: string[];
     roleLabel: string;
+    latestPayHistory: {
+      oldPayRate: number | null;
+      newPayRate: number;
+      effectiveDate: string | Date;
+    } | null;
   }>;
 };
 
@@ -99,25 +105,46 @@ export function EmployeesClient({ role, stores, employees }: EmployeesClientProp
                     <Badge variant={employee.status === "Active" ? "success" : "warning"}>{employee.status}</Badge>
                   </td>
                   <td className="px-4 py-3">
-                    {employee.kind === "EMPLOYEE" ? `$${employee.payRate.toFixed(2)}` : <span className="text-muted-foreground">N/A</span>}
+                    {employee.kind === "EMPLOYEE" || employee.payRate > 0 ? `$${employee.payRate.toFixed(2)}` : <span className="text-muted-foreground">N/A</span>}
                   </td>
                   <td className="px-4 py-3">
-                    {role === "MANAGER" || employee.kind === "USER" ? (
+                    {role === "MANAGER" ? (
                       <span className="text-muted-foreground">Read only</span>
                     ) : (
                       <div className="flex gap-2">
-                        <AddEmployeeModal
-                          triggerLabel="Edit"
-                          stores={stores}
-                          employee={{
-                            id: employee.id,
-                            name: employee.name,
-                            storeId: employee.storeIds[0] ?? "",
-                            status: employee.status,
-                            payRate: employee.payRate,
-                          }}
-                        />
-                        <Button variant="destructive" size="sm" onClick={() => deleteEmployee(employee.id)}>Delete</Button>
+                        {employee.kind === "EMPLOYEE" ? (
+                          <>
+                            <AddEmployeeModal
+                              triggerLabel="Edit"
+                              stores={stores}
+                              employee={{
+                                id: employee.id,
+                                name: employee.name,
+                                storeId: employee.storeIds[0] ?? "",
+                                status: employee.status,
+                                payRate: employee.payRate,
+                              }}
+                            />
+                            <ChangePayRateModal
+                              workerId={employee.id}
+                              workerType="EMPLOYEE"
+                              workerName={employee.name}
+                              currentPayRate={employee.payRate}
+                              latestPayHistory={employee.latestPayHistory}
+                            />
+                            <Button variant="destructive" size="sm" onClick={() => deleteEmployee(employee.id)}>Delete</Button>
+                          </>
+                        ) : employee.payRate > 0 ? (
+                          <ChangePayRateModal
+                            workerId={employee.id.replace("user-", "")}
+                            workerType="MANAGER"
+                            workerName={employee.name}
+                            currentPayRate={employee.payRate}
+                            latestPayHistory={employee.latestPayHistory}
+                          />
+                        ) : (
+                          <span className="text-muted-foreground">Read only</span>
+                        )}
                       </div>
                     )}
                   </td>

@@ -1,5 +1,6 @@
-import { addDays, endOfDay, startOfDay, subDays } from "date-fns";
+import { addDays, endOfDay, format, startOfDay, subDays } from "date-fns";
 import { prisma } from "@/backend/prisma";
+import { parseDateOnly } from "@/lib/utils";
 
 export async function getSettings() {
   const settings = await prisma.systemSettings.findFirst();
@@ -59,6 +60,10 @@ export async function getEmployeesForUser(user: {
           },
     include: {
       store: true,
+      payRateHistory: {
+        orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+        take: 1,
+      },
     },
     orderBy: {
       createdAt: "desc",
@@ -81,6 +86,7 @@ export async function getAttendanceForUser(user: {
           },
     include: {
       employee: true,
+      user: true,
       store: true,
     },
     orderBy: [{ date: "desc" }, { createdAt: "desc" }],
@@ -100,6 +106,38 @@ export async function getUserManagementData() {
           store: true,
         },
       },
+      payRateHistory: {
+        orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+        take: 1,
+      },
+    },
+    orderBy: {
+      createdAt: "asc",
+    },
+  });
+}
+
+export async function getManagerWorkersForUser(user: {
+  role: string;
+  assignedStores: string[];
+}) {
+  return prisma.user.findMany({
+    where: {
+      role: "MANAGER",
+      ...(user.role === "OWNER"
+        ? {}
+        : {
+            assignedStores: {
+              some: {
+                storeId: {
+                  in: user.assignedStores,
+                },
+              },
+            },
+          }),
+    },
+    include: {
+      assignedStores: true,
     },
     orderBy: {
       createdAt: "asc",
@@ -115,8 +153,10 @@ export async function getPayrollForUser(
   from?: string,
   to?: string,
 ) {
-  const start = from ? startOfDay(new Date(from)) : startOfDay(subDays(new Date(), 13));
-  const end = to ? endOfDay(new Date(to)) : endOfDay(addDays(start, 13));
+  const start = from ? startOfDay(parseDateOnly(from)) : startOfDay(subDays(new Date(), 13));
+  const end = to ? endOfDay(parseDateOnly(to)) : endOfDay(addDays(start, 13));
+  const payPeriodStart = from ?? format(start, "yyyy-MM-dd");
+  const payPeriodEnd = to ?? format(end, "yyyy-MM-dd");
 
   const entries = await prisma.attendance.findMany({
     where: {
@@ -134,41 +174,62 @@ export async function getPayrollForUser(
     },
     include: {
       employee: true,
+      user: true,
       store: true,
     },
+    orderBy: [{ date: "asc" }, { createdAt: "asc" }],
   });
 
   const grouped = new Map<string, {
-    employeeId: string;
-    employeeName: string;
+    workerId: string;
+    workerType: "EMPLOYEE" | "MANAGER";
+    workerName: string;
     storeId: string;
     storeName: string;
-    payRate: number;
+    payRate: number | null;
     totalHours: number;
+    totalPay: number;
+    hasMixedRates: boolean;
   }>();
 
   for (const entry of entries) {
-    const key = `${entry.employeeId}-${entry.storeId}`;
+    const isManager = Boolean(entry.userId);
+    const workerId = entry.userId ?? entry.employeeId ?? "";
+    const payRate = entry.payRateSnapshot;
+    const workerName = isManager ? entry.user?.username ?? "Unknown worker" : entry.employee?.name ?? "Unknown worker";
+    const key = `${workerId}-${entry.storeId}-${isManager ? "MANAGER" : "EMPLOYEE"}`;
     const existing = grouped.get(key);
 
     if (existing) {
       existing.totalHours += entry.totalHours;
+      existing.totalPay += entry.totalHours * payRate;
+      existing.hasMixedRates = existing.hasMixedRates || existing.payRate !== payRate;
+      existing.payRate = payRate;
       continue;
     }
 
     grouped.set(key, {
-      employeeId: entry.employeeId,
-      employeeName: entry.employee.name,
+      workerId,
+      workerType: isManager ? "MANAGER" : "EMPLOYEE",
+      workerName,
       storeId: entry.storeId,
       storeName: entry.store.name,
-      payRate: entry.employee.payRate,
+      payRate,
       totalHours: entry.totalHours,
+      totalPay: entry.totalHours * payRate,
+      hasMixedRates: false,
     });
   }
 
   return Array.from(grouped.values()).map((row) => ({
-    ...row,
-    payPeriod: `${start.toISOString()}|${end.toISOString()}`,
-    totalPay: Number((row.totalHours * row.payRate).toFixed(2)),
+    workerId: row.workerId,
+    workerType: row.workerType,
+    workerName: row.workerName,
+    storeId: row.storeId,
+    storeName: row.storeName,
+    payRate: row.hasMixedRates ? null : row.payRate,
+    totalHours: Number(row.totalHours.toFixed(2)),
+    payPeriod: `${payPeriodStart}|${payPeriodEnd}`,
+    totalPay: Number(row.totalPay.toFixed(2)),
   }));
 }

@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { format } from "date-fns";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AddAttendanceModal } from "@/frontend/components/modals/add-attendance-modal";
@@ -16,21 +15,22 @@ type AttendanceClientProps = {
   role: string;
   pastDaysAllowed: number | null;
   stores: Array<{ id: string; name: string }>;
-  employees: Array<{ id: string; name: string; storeId: string }>;
+  workers: Array<{ id: string; name: string; storeIds: string[]; workerType: "EMPLOYEE" | "MANAGER" }>;
   attendance: Array<{
     id: string;
     date: string;
     clockIn: string;
     clockOut: string;
     totalHours: number;
-    employeeId: string;
+    workerId: string;
+    workerType: "EMPLOYEE" | "MANAGER";
+    workerName: string;
     storeId: string;
-    employee: { name: string };
     store: { name: string };
   }>;
 };
 
-export function AttendanceClient({ role, pastDaysAllowed, stores, employees, attendance }: AttendanceClientProps) {
+export function AttendanceClient({ role, pastDaysAllowed, stores, workers, attendance }: AttendanceClientProps) {
   const router = useRouter();
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("all");
@@ -40,9 +40,9 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, employees, att
   const filtered = useMemo(
     () =>
       attendance.filter((entry) => {
-        const matchesSearch = entry.employee.name.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch = entry.workerName.toLowerCase().includes(search.toLowerCase());
         const matchesStore = storeFilter === "all" || entry.storeId === storeFilter;
-        const entryDate = format(new Date(entry.date), "yyyy-MM-dd");
+        const entryDate = entry.date;
         const matchesFrom = !fromDate || entryDate >= fromDate;
         const matchesTo = !toDate || entryDate <= toDate;
         return matchesSearch && matchesStore && matchesFrom && matchesTo;
@@ -92,7 +92,7 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, employees, att
             <AddAttendanceModal
               triggerLabel="Add Attendance"
               stores={stores}
-              employees={employees}
+              workers={workers}
               role={role}
               pastDaysAllowed={pastDaysAllowed}
             />
@@ -103,8 +103,9 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, employees, att
             <table className="min-w-full text-sm">
               <thead className="bg-slate-50 text-left">
                 <tr>
-                  <th className="px-4 py-3 font-medium">Employee Name</th>
+                  <th className="px-4 py-3 font-medium">Worker</th>
                   <th className="px-4 py-3 font-medium">Store</th>
+                  <th className="px-4 py-3 font-medium">Type</th>
                   <th className="px-4 py-3 font-medium">Date</th>
                   <th className="px-4 py-3 font-medium">Clock In</th>
                   <th className="px-4 py-3 font-medium">Clock Out</th>
@@ -115,8 +116,9 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, employees, att
               <tbody>
                 {filtered.map((entry) => (
                   <tr key={entry.id} className="border-t">
-                    <td className="px-4 py-3 font-medium">{entry.employee.name}</td>
+                    <td className="px-4 py-3 font-medium">{entry.workerName}</td>
                     <td className="px-4 py-3">{entry.store.name}</td>
+                    <td className="px-4 py-3"><Badge variant={entry.workerType === "MANAGER" ? "default" : "outline"}>{entry.workerType === "MANAGER" ? "Manager" : "Employee"}</Badge></td>
                     <td className="px-4 py-3">{formatDate(entry.date)}</td>
                     <td className="px-4 py-3">{entry.clockIn}</td>
                     <td className="px-4 py-3">{entry.clockOut}</td>
@@ -129,12 +131,13 @@ export function AttendanceClient({ role, pastDaysAllowed, stores, employees, att
                           <AddAttendanceModal
                             triggerLabel="Edit"
                             stores={stores}
-                            employees={employees}
+                            workers={workers}
                             role={role}
                             pastDaysAllowed={pastDaysAllowed}
                             attendance={{
                               id: entry.id,
-                              employeeId: entry.employeeId,
+                              workerId: entry.workerId,
+                              workerType: entry.workerType,
                               storeId: entry.storeId,
                               date: entry.date,
                               clockIn: entry.clockIn,

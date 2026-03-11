@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { addHours } from "date-fns";
+import { addHours, startOfDay } from "date-fns";
 import { randomUUID } from "crypto";
 import { NextResponse } from "next/server";
 import { prisma } from "@/backend/prisma";
@@ -9,8 +9,9 @@ import {
   coOwnerSchema,
   forgotPasswordSchema,
   managerSchema,
+  setNewPasswordSchema,
 } from "@/backend/validations";
-import { generateTempPassword, maskEmail } from "@/lib/utils";
+import { generateTempPassword } from "@/lib/utils";
 
 export async function GET() {
   await requireRole(["OWNER"]);
@@ -40,20 +41,26 @@ export async function POST(request: Request) {
   if (intent === "forgot-password") {
     const parsed = forgotPasswordSchema.safeParse(body);
     if (!parsed.success) {
-      return NextResponse.json({ error: "Username is required" }, { status: 400 });
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
     }
 
     const owner = await prisma.user.findFirst({
       where: {
         username: parsed.data.username,
         role: "OWNER",
-        recoveryEmail: { not: null },
+        recoveryEmail: parsed.data.recoveryEmail,
       },
     });
 
     if (!owner?.recoveryEmail) {
-      return NextResponse.json({ error: "Owner recovery email not found" }, { status: 404 });
+      return NextResponse.json({ error: "Username and recovery email do not match" }, { status: 404 });
     }
+
+    await prisma.passwordResetToken.deleteMany({
+      where: {
+        userId: owner.id,
+      },
+    });
 
     const token = randomUUID();
     await prisma.passwordResetToken.create({
@@ -64,11 +71,9 @@ export async function POST(request: Request) {
       },
     });
 
-    console.info(`StoreHub password reset link: ${process.env.NEXTAUTH_URL}/change-password?token=${token}`);
-
     return NextResponse.json({
       success: true,
-      message: `A reset link was sent to ${maskEmail(owner.recoveryEmail)}.`,
+      redirectTo: `/forgot-password/reset?token=${token}`,
     });
   }
 
@@ -89,6 +94,7 @@ export async function POST(request: Request) {
       role,
       mustChangePassword: true,
       pastDaysAllowed: role === "MANAGER" ? body.pastDaysAllowed : null,
+      payRate: role === "MANAGER" ? Number(body.payRate) : null,
       assignedStores: {
         createMany: {
           data: parsed.data.storeIds.map((storeId) => ({ storeId })),
@@ -96,6 +102,17 @@ export async function POST(request: Request) {
       },
     },
   });
+
+  if (role === "MANAGER") {
+    await prisma.payRateHistory.create({
+      data: {
+        userId: user.id,
+        oldPayRate: null,
+        newPayRate: Number(body.payRate),
+        effectiveDate: startOfDay(new Date()),
+      },
+    });
+  }
 
   return NextResponse.json({ success: true, userId: user.id });
 }
@@ -135,6 +152,37 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true });
   }
 
+  if (intent === "owner-reset-password") {
+    const parsed = setNewPasswordSchema.safeParse(body);
+
+    if (!parsed.success) {
+      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+    }
+
+    const resetToken = await prisma.passwordResetToken.findUnique({
+      where: { token: parsed.data.token },
+      include: { user: true },
+    });
+
+    if (!resetToken || resetToken.user.role !== "OWNER" || resetToken.expiresAt < new Date()) {
+      return NextResponse.json({ error: "Reset session is invalid or expired" }, { status: 400 });
+    }
+
+    await prisma.user.update({
+      where: { id: resetToken.userId },
+      data: {
+        password: await bcrypt.hash(parsed.data.newPassword, 10),
+        mustChangePassword: false,
+      },
+    });
+
+    await prisma.passwordResetToken.delete({
+      where: { token: parsed.data.token },
+    });
+
+    return NextResponse.json({ success: true });
+  }
+
   await requireRole(["OWNER"]);
 
   if (intent === "reset-password") {
@@ -151,11 +199,20 @@ export async function PATCH(request: Request) {
   }
 
   const role = body.role;
+  const existingUser =
+    role === "MANAGER"
+      ? await prisma.user.findUnique({
+          where: { id: body.userId },
+          select: { payRate: true },
+        })
+      : null;
+
   await prisma.user.update({
     where: { id: body.userId },
     data: {
       username: body.username,
       pastDaysAllowed: role === "MANAGER" ? Number(body.pastDaysAllowed) : null,
+      payRate: role === "MANAGER" ? Number(body.payRate) : null,
       assignedStores: {
         deleteMany: {},
         createMany: {
@@ -164,6 +221,17 @@ export async function PATCH(request: Request) {
       },
     },
   });
+
+  if (role === "MANAGER" && existingUser && existingUser.payRate !== Number(body.payRate)) {
+    await prisma.payRateHistory.create({
+      data: {
+        userId: body.userId,
+        oldPayRate: existingUser.payRate,
+        newPayRate: Number(body.payRate),
+        effectiveDate: startOfDay(new Date()),
+      },
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

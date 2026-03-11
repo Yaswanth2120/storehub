@@ -28,6 +28,7 @@ type AddUserModalProps = {
     id: string;
     username: string;
     pastDaysAllowed: number | null;
+    payRate?: number | null;
     storeIds: string[];
   };
 };
@@ -50,7 +51,7 @@ export function AddUserModal({ role, triggerLabel, stores, user }: AddUserModalP
       username: user?.username ?? "",
       password: generateTempPassword(),
       storeIds: user?.storeIds ?? [],
-      ...(role === "MANAGER" ? { pastDaysAllowed: user?.pastDaysAllowed ?? 3 } : {}),
+      ...(role === "MANAGER" ? { pastDaysAllowed: user?.pastDaysAllowed ?? 3, payRate: user?.payRate ?? 20 } : {}),
     },
   });
 
@@ -135,10 +136,17 @@ export function AddUserModal({ role, triggerLabel, stores, user }: AddUserModalP
             {formErrors.storeIds ? <p className="text-xs text-destructive">{formErrors.storeIds.message}</p> : null}
           </div>
           {role === "MANAGER" ? (
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Past days allowed</label>
-              <Input type="number" min={1} max={30} {...register("pastDaysAllowed" as never)} />
-              {formErrors.pastDaysAllowed ? <p className="text-xs text-destructive">{formErrors.pastDaysAllowed.message}</p> : null}
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Past days allowed</label>
+                <Input type="number" min={1} max={30} {...register("pastDaysAllowed" as never)} />
+                {formErrors.pastDaysAllowed ? <p className="text-xs text-destructive">{formErrors.pastDaysAllowed.message}</p> : null}
+              </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Pay rate ($/hr)</label>
+                <Input type="number" min={1} step="0.01" {...register("payRate" as never)} />
+                {formErrors.payRate ? <p className="text-xs text-destructive">{formErrors.payRate.message}</p> : null}
+              </div>
             </div>
           ) : null}
           <DialogFooter>

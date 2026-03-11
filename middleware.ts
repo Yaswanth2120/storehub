@@ -18,7 +18,7 @@ export default withAuth(
       return NextResponse.redirect(new URL("/stores", request.url));
     }
 
-    if (token.role === "MANAGER" && ["/users", "/payroll", "/settings"].includes(pathname)) {
+    if (token.role === "MANAGER" && ["/users", "/payroll"].includes(pathname)) {
       return NextResponse.redirect(new URL("/stores", request.url));
     }
 

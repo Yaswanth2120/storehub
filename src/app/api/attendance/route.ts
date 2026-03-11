@@ -1,8 +1,9 @@
-import { differenceInCalendarDays, startOfDay } from "date-fns";
+import { differenceInCalendarDays, format, startOfDay } from "date-fns";
 import { NextResponse } from "next/server";
 import { prisma } from "@/backend/prisma";
 import { canAccessStore, requireRole, requireUser } from "@/backend/auth";
 import { attendanceSchema } from "@/backend/validations";
+import { parseDateOnly } from "@/lib/utils";
 
 function isAllowedManagerDate(target: Date, pastDaysAllowed: number | null) {
   if (!pastDaysAllowed) {
@@ -27,20 +28,27 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Store access denied" }, { status: 403 });
   }
 
-  const targetDate = new Date(parsed.data.date);
+  const targetDate = parseDateOnly(parsed.data.date);
 
   if (user.role === "MANAGER" && !isAllowedManagerDate(targetDate, user.pastDaysAllowed)) {
     return NextResponse.json({ error: "Attendance date is outside your allowed range" }, { status: 403 });
   }
 
+  const payRateSnapshot =
+    parsed.data.workerType === "MANAGER"
+      ? (await prisma.user.findUnique({ where: { id: parsed.data.workerId }, select: { payRate: true } }))?.payRate ?? 0
+      : (await prisma.employee.findUnique({ where: { id: parsed.data.workerId }, select: { payRate: true } }))?.payRate ?? 0;
+
   await prisma.attendance.create({
     data: {
-      employeeId: parsed.data.employeeId,
+      employeeId: parsed.data.workerType === "EMPLOYEE" ? parsed.data.workerId : null,
+      userId: parsed.data.workerType === "MANAGER" ? parsed.data.workerId : null,
       storeId: parsed.data.storeId,
       date: targetDate,
       clockIn: parsed.data.clockIn,
       clockOut: parsed.data.clockOut,
       totalHours: parsed.data.totalHours,
+      payRateSnapshot,
     },
   });
 
@@ -62,12 +70,17 @@ export async function PATCH(request: Request) {
   await prisma.attendance.update({
     where: { id: body.attendanceId },
     data: {
-      employeeId: body.employeeId,
+      employeeId: body.workerType === "EMPLOYEE" ? body.workerId : null,
+      userId: body.workerType === "MANAGER" ? body.workerId : null,
       storeId: body.storeId,
-      date: new Date(body.date),
+      date: parseDateOnly(body.date),
       clockIn: body.clockIn,
       clockOut: body.clockOut,
       totalHours: Number(body.totalHours),
+      payRateSnapshot:
+        body.workerType === "MANAGER"
+          ? (await prisma.user.findUnique({ where: { id: body.workerId }, select: { payRate: true } }))?.payRate ?? 0
+          : (await prisma.employee.findUnique({ where: { id: body.workerId }, select: { payRate: true } }))?.payRate ?? 0,
     },
   });
 
@@ -106,6 +119,7 @@ export async function GET() {
           },
     include: {
       employee: true,
+      user: true,
       store: true,
     },
     orderBy: {
@@ -113,5 +127,10 @@ export async function GET() {
     },
   });
 
-  return NextResponse.json(records);
+  return NextResponse.json(
+    records.map((record) => ({
+      ...record,
+      date: format(record.date, "yyyy-MM-dd"),
+    })),
+  );
 }

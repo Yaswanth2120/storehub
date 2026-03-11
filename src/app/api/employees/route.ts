@@ -1,3 +1,4 @@
+import { startOfDay } from "date-fns";
 import { NextResponse } from "next/server";
 import { prisma } from "@/backend/prisma";
 import { canAccessStore, requireRole, requireUser } from "@/backend/auth";
@@ -16,7 +17,16 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Store access denied" }, { status: 403 });
   }
 
-  await prisma.employee.create({ data: parsed.data });
+  const employee = await prisma.employee.create({ data: parsed.data });
+  await prisma.payRateHistory.create({
+    data: {
+      employeeId: employee.id,
+      oldPayRate: null,
+      newPayRate: parsed.data.payRate,
+      effectiveDate: startOfDay(new Date()),
+    },
+  });
+
   return NextResponse.json({ success: true });
 }
 
@@ -33,6 +43,11 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Store access denied" }, { status: 403 });
   }
 
+  const currentEmployee = await prisma.employee.findUnique({
+    where: { id: body.employeeId },
+    select: { payRate: true },
+  });
+
   await prisma.employee.update({
     where: { id: body.employeeId },
     data: {
@@ -42,6 +57,17 @@ export async function PATCH(request: Request) {
       payRate: Number(body.payRate),
     },
   });
+
+  if (currentEmployee && currentEmployee.payRate !== Number(body.payRate)) {
+    await prisma.payRateHistory.create({
+      data: {
+        employeeId: body.employeeId,
+        oldPayRate: currentEmployee.payRate,
+        newPayRate: Number(body.payRate),
+        effectiveDate: startOfDay(new Date()),
+      },
+    });
+  }
 
   return NextResponse.json({ success: true });
 }

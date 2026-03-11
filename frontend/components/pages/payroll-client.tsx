@@ -9,11 +9,12 @@ import { Skeleton } from "@/frontend/components/ui/skeleton";
 import { formatDate } from "@/lib/utils";
 
 type PayrollRow = {
-  employeeId: string;
-  employeeName: string;
+  workerId: string;
+  workerType: "EMPLOYEE" | "MANAGER";
+  workerName: string;
   storeId: string;
   storeName: string;
-  payRate: number;
+  payRate: number | null;
   totalHours: number;
   totalPay: number;
   payPeriod: string;
@@ -68,7 +69,7 @@ export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: Payro
   const filtered = useMemo(
     () =>
       rows.filter((row) => {
-        const matchesSearch = row.employeeName.toLowerCase().includes(search.toLowerCase());
+        const matchesSearch = row.workerName.toLowerCase().includes(search.toLowerCase());
         const matchesStore = storeFilter === "all" || row.storeId === storeFilter;
         return matchesSearch && matchesStore;
       }),
@@ -154,7 +155,7 @@ export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: Payro
               <table className="min-w-full text-sm">
                 <thead className="border-b bg-white text-left uppercase tracking-[0.18em] text-slate-400">
                   <tr>
-                    <th className="px-10 py-5 font-semibold">Employee</th>
+                            <th className="px-10 py-5 font-semibold">Worker</th>
                     <th className="px-6 py-5 font-semibold">Store</th>
                     <th className="px-6 py-5 font-semibold">Pay Period</th>
                     <th className="px-6 py-5 font-semibold">Total Hours</th>
@@ -174,14 +175,21 @@ export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: Payro
                       const [from, to] = row.payPeriod.split("|");
 
                       return (
-                        <tr key={`${row.employeeId}-${row.storeId}`} className="border-b last:border-b-0">
-                          <td className="px-10 py-6 text-lg font-semibold text-slate-900">{row.employeeName}</td>
+                        <tr key={`${row.workerId}-${row.storeId}`} className="border-b last:border-b-0">
+                          <td className="px-10 py-6 text-lg font-semibold text-slate-900">
+                            {row.workerName}
+                            {row.workerType === "MANAGER" ? (
+                              <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-primary">Manager</span>
+                            ) : null}
+                          </td>
                           <td className="px-6 py-6 text-lg text-slate-600">{row.storeName}</td>
                           <td className="px-6 py-6 text-lg text-slate-600">
                             {formatDate(from)} - {formatDate(to)}
                           </td>
                           <td className="px-6 py-6 text-lg text-slate-900">{row.totalHours.toFixed(1)}h</td>
-                          <td className="px-6 py-6 text-lg text-slate-900">${row.payRate.toFixed(2)}</td>
+                          <td className="px-6 py-6 text-lg text-slate-900">
+                            {row.payRate == null ? "Varies" : `$${row.payRate.toFixed(2)}`}
+                          </td>
                           <td className="px-6 py-6 text-lg font-semibold text-slate-900">${row.totalPay.toFixed(2)}</td>
                         </tr>
                       );

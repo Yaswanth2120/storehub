@@ -48,6 +48,10 @@ export default async function EmployeesPage() {
             store: true,
           },
         },
+        payRateHistory: {
+          orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
+          take: 1,
+        },
       },
       orderBy: {
         createdAt: "asc",
@@ -62,6 +66,7 @@ export default async function EmployeesPage() {
       kind: "EMPLOYEE" as const,
       status: employee.status,
       payRate: employee.payRate,
+      latestPayHistory: employee.payRateHistory[0] ?? null,
       storeIds: [employee.storeId],
       storeNames: [employee.store.name],
       roleLabel: "Employee",
@@ -71,7 +76,8 @@ export default async function EmployeesPage() {
       name: person.username,
       kind: "USER" as const,
       status: "Active",
-      payRate: 0,
+      payRate: person.payRate ?? 0,
+      latestPayHistory: person.payRateHistory[0] ?? null,
       storeIds: person.assignedStores.map((entry) => entry.storeId),
       storeNames:
         person.role === "OWNER" && person.assignedStores.length === 0

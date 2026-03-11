@@ -15,7 +15,10 @@ model User {
   mustChangePassword Boolean              @default(false)
   recoveryEmail      String?
   pastDaysAllowed    Int?
+  payRate            Float?
   assignedStores     StoreUser[]
+  attendance         Attendance[]
+  payRateHistory     PayRateHistory[]
   resetTokens        PasswordResetToken[]
   createdAt          DateTime             @default(now())
 }
@@ -48,22 +51,41 @@ model Employee {
   status     String
   store      Store        @relation(fields: [storeId], references: [id], onDelete: Cascade)
   attendance Attendance[]
+  payRateHistory PayRateHistory[]
   createdAt  DateTime     @default(now())
 }
 
 model Attendance {
-  id         String   @id @default(cuid())
-  employeeId String
+  id         String    @id @default(cuid())
+  employeeId String?
+  userId     String?
   storeId    String
   date       DateTime
   clockIn    String
   clockOut   String
   totalHours Float
-  employee   Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
-  createdAt  DateTime @default(now())
+  payRateSnapshot Float    @default(0)
+  employee   Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  store      Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime  @default(now())
 
   @@index([storeId, date])
+}
+
+model PayRateHistory {
+  id           String    @id @default(cuid())
+  employeeId   String?
+  userId       String?
+  oldPayRate   Float?
+  newPayRate   Float
+  effectiveDate DateTime
+  createdAt    DateTime  @default(now())
+  employee     Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  user         User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([employeeId, effectiveDate])
+  @@index([userId, effectiveDate])
 }
 
 model SystemSettings {

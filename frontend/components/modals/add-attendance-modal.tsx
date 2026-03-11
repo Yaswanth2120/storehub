@@ -18,18 +18,19 @@ import {
 } from "@/frontend/components/ui/dialog";
 import { Input } from "@/frontend/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
-import { calculateHours } from "@/lib/utils";
+import { calculateHours, formatDate } from "@/lib/utils";
 import { attendanceSchema } from "@/backend/validations";
 
 type AddAttendanceModalProps = {
   triggerLabel: string;
   stores: Array<{ id: string; name: string }>;
-  employees: Array<{ id: string; name: string; storeId: string }>;
+  workers: Array<{ id: string; name: string; storeIds: string[]; workerType: "EMPLOYEE" | "MANAGER" }>;
   role: string;
   pastDaysAllowed: number | null;
   attendance?: {
     id: string;
-    employeeId: string;
+    workerId: string;
+    workerType: "EMPLOYEE" | "MANAGER";
     storeId: string;
     date: string;
     clockIn: string;
@@ -41,7 +42,7 @@ type AddAttendanceModalProps = {
 export function AddAttendanceModal({
   triggerLabel,
   stores,
-  employees,
+  workers,
   role,
   pastDaysAllowed,
   attendance,
@@ -58,9 +59,10 @@ export function AddAttendanceModal({
   } = useForm({
     resolver: zodResolver(attendanceSchema),
     defaultValues: {
-      employeeId: attendance?.employeeId ?? "",
+      workerId: attendance?.workerId ?? "",
+      workerType: attendance?.workerType ?? "EMPLOYEE",
       storeId: attendance?.storeId ?? stores[0]?.id ?? "",
-      date: attendance?.date ? format(new Date(attendance.date), "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
+      date: attendance?.date ? formatDate(attendance.date, "yyyy-MM-dd") : format(new Date(), "yyyy-MM-dd"),
       clockIn: attendance?.clockIn ?? "09:00",
       clockOut: attendance?.clockOut ?? "17:00",
       totalHours: attendance?.totalHours ?? 8,
@@ -68,6 +70,7 @@ export function AddAttendanceModal({
   });
 
   const storeId = watch("storeId");
+  const workerType = watch("workerType");
   const clockIn = watch("clockIn");
   const clockOut = watch("clockOut");
   const totalHours = useMemo(() => calculateHours(clockIn, clockOut), [clockIn, clockOut]);
@@ -76,7 +79,7 @@ export function AddAttendanceModal({
     setValue("totalHours", totalHours);
   }, [totalHours, setValue]);
 
-  const filteredEmployees = employees.filter((employee) => employee.storeId === storeId);
+  const filteredWorkers = workers.filter((worker) => worker.storeIds.includes(storeId));
   const minDate =
     role === "MANAGER" && pastDaysAllowed ? format(subDays(new Date(), pastDaysAllowed), "yyyy-MM-dd") : undefined;
   const maxDate = format(new Date(), "yyyy-MM-dd");
@@ -124,16 +127,28 @@ export function AddAttendanceModal({
             </Select>
           </div>
           <div className="space-y-2">
-            <label className="text-sm font-medium">Employee</label>
-            <Select value={watch("employeeId")} onValueChange={(value) => setValue("employeeId", value, { shouldValidate: true })}>
-              <SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+            <label className="text-sm font-medium">Worker type</label>
+            <Select value={workerType} onValueChange={(value) => setValue("workerType", value as "EMPLOYEE" | "MANAGER", { shouldValidate: true })}>
+              <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
               <SelectContent>
-                {filteredEmployees.map((employee) => (
-                  <SelectItem key={employee.id} value={employee.id}>{employee.name}</SelectItem>
-                ))}
+                <SelectItem value="EMPLOYEE">Employee</SelectItem>
+                <SelectItem value="MANAGER">Manager</SelectItem>
               </SelectContent>
             </Select>
-            {errors.employeeId ? <p className="text-xs text-destructive">{errors.employeeId.message}</p> : null}
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium">{workerType === "MANAGER" ? "Manager" : "Employee"}</label>
+            <Select value={watch("workerId")} onValueChange={(value) => setValue("workerId", value, { shouldValidate: true })}>
+              <SelectTrigger><SelectValue placeholder={`Select ${workerType === "MANAGER" ? "manager" : "employee"}`} /></SelectTrigger>
+              <SelectContent>
+                {filteredWorkers
+                  .filter((worker) => worker.workerType === workerType)
+                  .map((worker) => (
+                    <SelectItem key={worker.id} value={worker.id}>{worker.name}</SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
+            {errors.workerId ? <p className="text-xs text-destructive">{errors.workerId.message}</p> : null}
           </div>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">

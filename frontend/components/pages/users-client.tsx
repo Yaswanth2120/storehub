@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AddUserModal } from "@/frontend/components/modals/add-user-modal";
+import { ChangePayRateModal } from "@/frontend/components/modals/change-pay-rate-modal";
 import { ResetPasswordModal } from "@/frontend/components/modals/reset-password-modal";
 import { Badge } from "@/frontend/components/ui/badge";
 import { Button } from "@/frontend/components/ui/button";
@@ -17,6 +18,12 @@ type UsersClientProps = {
     username: string;
     role: "CO_OWNER" | "MANAGER";
     pastDaysAllowed: number | null;
+    payRate?: number | null;
+    payRateHistory?: Array<{
+      oldPayRate: number | null;
+      newPayRate: number;
+      effectiveDate: string | Date;
+    }>;
     assignedStores: Array<{ store: { id: string; name: string } }>;
   }>;
 };
@@ -66,6 +73,7 @@ export function UsersClient({ stores, users }: UsersClientProps) {
                     <th className="px-4 py-3 font-medium">Username</th>
                     <th className="px-4 py-3 font-medium">Assigned Stores</th>
                     {tab === "MANAGER" ? <th className="px-4 py-3 font-medium">Past Days Allowed</th> : null}
+                    {tab === "MANAGER" ? <th className="px-4 py-3 font-medium">Pay Rate</th> : null}
                     <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
@@ -81,6 +89,7 @@ export function UsersClient({ stores, users }: UsersClientProps) {
                         </div>
                       </td>
                       {tab === "MANAGER" ? <td className="px-4 py-3">{user.pastDaysAllowed}</td> : null}
+                      {tab === "MANAGER" ? <td className="px-4 py-3">${(user.payRate ?? 0).toFixed(2)}</td> : null}
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           <AddUserModal
@@ -91,9 +100,19 @@ export function UsersClient({ stores, users }: UsersClientProps) {
                               id: user.id,
                               username: user.username,
                               pastDaysAllowed: user.pastDaysAllowed,
+                              payRate: user.payRate,
                               storeIds: user.assignedStores.map((entry) => entry.store.id),
                             }}
                           />
+                          {user.role === "MANAGER" && (user.payRate ?? 0) > 0 ? (
+                            <ChangePayRateModal
+                              workerId={user.id}
+                              workerType="MANAGER"
+                              workerName={user.username}
+                              currentPayRate={user.payRate ?? 0}
+                              latestPayHistory={user.payRateHistory?.[0] ?? null}
+                            />
+                          ) : null}
                           <ResetPasswordModal userId={user.id} />
                           <Button variant="destructive" size="sm" onClick={() => deleteUser(user.id)}>Delete</Button>
                         </div>

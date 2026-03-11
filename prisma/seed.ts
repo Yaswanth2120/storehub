@@ -6,6 +6,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   await prisma.passwordResetToken.deleteMany();
+  await prisma.payRateHistory.deleteMany();
   await prisma.attendance.deleteMany();
   await prisma.employee.deleteMany();
   await prisma.storeUser.deleteMany();
@@ -51,6 +52,7 @@ async function main() {
       role: "MANAGER",
       mustChangePassword: true,
       pastDaysAllowed: 3,
+      payRate: 21,
     },
   });
 
@@ -61,6 +63,7 @@ async function main() {
       role: "MANAGER",
       mustChangePassword: false,
       pastDaysAllowed: 2,
+      payRate: 22.5,
     },
   });
 
@@ -88,9 +91,55 @@ async function main() {
     }),
   ]);
 
+  const emmaRaiseDate = subDays(new Date(), 2);
+  const sarahRaiseDate = subDays(new Date(), 1);
+
+  await prisma.payRateHistory.createMany({
+    data: [
+      {
+        employeeId: employees[0].id,
+        oldPayRate: 17,
+        newPayRate: 18.5,
+        effectiveDate: emmaRaiseDate,
+      },
+      {
+        employeeId: employees[1].id,
+        oldPayRate: null,
+        newPayRate: 19,
+        effectiveDate: subDays(new Date(), 30),
+      },
+      {
+        employeeId: employees[2].id,
+        oldPayRate: null,
+        newPayRate: 20,
+        effectiveDate: subDays(new Date(), 30),
+      },
+      {
+        employeeId: employees[3].id,
+        oldPayRate: null,
+        newPayRate: 17.5,
+        effectiveDate: subDays(new Date(), 30),
+      },
+      {
+        userId: sarah.id,
+        oldPayRate: 20,
+        newPayRate: 21,
+        effectiveDate: sarahRaiseDate,
+      },
+      {
+        userId: michael.id,
+        oldPayRate: null,
+        newPayRate: 22.5,
+        effectiveDate: subDays(new Date(), 30),
+      },
+    ],
+  });
+
   const attendanceData = Array.from({ length: 7 }).flatMap((_, index) => {
     const date = subDays(new Date(), index);
     const workDate = set(date, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 });
+    const emmaPayRate = workDate >= set(emmaRaiseDate, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 }) ? 18.5 : 17;
+    const sarahPayRate = workDate >= set(sarahRaiseDate, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 }) ? 21 : 20;
 
     return [
       {
@@ -100,6 +149,7 @@ async function main() {
         clockIn: "09:00",
         clockOut: "17:00",
         totalHours: 8,
+        payRateSnapshot: emmaPayRate,
       },
       {
         employeeId: employees[1].id,
@@ -108,6 +158,7 @@ async function main() {
         clockIn: "10:00",
         clockOut: "18:30",
         totalHours: 8.5,
+        payRateSnapshot: 19,
       },
       {
         employeeId: employees[2].id,
@@ -116,6 +167,25 @@ async function main() {
         clockIn: "08:30",
         clockOut: "16:30",
         totalHours: 8,
+        payRateSnapshot: 20,
+      },
+      {
+        userId: sarah.id,
+        storeId: stores[0].id,
+        date: workDate,
+        clockIn: "12:00",
+        clockOut: "18:00",
+        totalHours: 6,
+        payRateSnapshot: sarahPayRate,
+      },
+      {
+        userId: michael.id,
+        storeId: stores[1].id,
+        date: workDate,
+        clockIn: "11:00",
+        clockOut: "17:00",
+        totalHours: 6,
+        payRateSnapshot: 22.5,
       },
     ];
   });

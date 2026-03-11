@@ -39,5 +39,6 @@ export const NAV_ITEMS = {
     { href: "/stores", label: "Stores", icon: Building2 },
     { href: "/employees", label: "Employees", icon: Users },
     { href: "/attendance", label: "Attendance", icon: CalendarClock },
+    { href: "/settings", label: "Settings", icon: Settings },
   ],
 };
