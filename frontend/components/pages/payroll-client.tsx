@@ -129,21 +129,10 @@ export function PayrollClient({ stores, payroll }: PayrollClientProps) {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3">
-
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-
-            <Input
-              placeholder="Search employee"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 w-[200px]"
-            />
-          </div>
+        <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:flex-nowrap lg:items-center">
 
           <Select value={storeFilter} onValueChange={setStoreFilter}>
-            <SelectTrigger className="w-[180px]">
+            <SelectTrigger className="w-full lg:w-[180px]">
               <SelectValue placeholder="All stores" />
             </SelectTrigger>
 
@@ -163,6 +152,7 @@ export function PayrollClient({ stores, payroll }: PayrollClientProps) {
             value={fromDate}
             max={toDate}
             onChange={(e) => setFromDate(e.target.value)}
+            className="w-full lg:w-[170px]"
           />
 
           <Input
@@ -171,7 +161,19 @@ export function PayrollClient({ stores, payroll }: PayrollClientProps) {
             min={fromDate}
             max={getToday()}
             onChange={(e) => setToDate(e.target.value)}
+            className="w-full lg:w-[170px]"
           />
+
+          <div className="relative w-full lg:w-[220px]">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+            <Input
+              placeholder="Search employee"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9"
+            />
+          </div>
 
         </div>
 
