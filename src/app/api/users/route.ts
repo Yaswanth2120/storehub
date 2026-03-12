@@ -14,7 +14,8 @@ import {
 import { generateTempPassword } from "@/lib/utils";
 
 export async function GET() {
-  await requireRole(["OWNER"]);
+  await requireRole(["OWNER", "CO_OWNER"]);
+
   const users = await prisma.user.findMany({
     where: {
       role: {
@@ -43,10 +44,16 @@ export async function POST(request: Request) {
   const intent = searchParams.get("intent");
   const body = await request.json();
 
+  /* ---------------- FORGOT PASSWORD ---------------- */
+
   if (intent === "forgot-password") {
     const parsed = forgotPasswordSchema.safeParse(body);
+
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
     }
 
     const owner = await prisma.user.findFirst({
@@ -58,16 +65,18 @@ export async function POST(request: Request) {
     });
 
     if (!owner?.recoveryEmail) {
-      return NextResponse.json({ error: "Username and recovery email do not match" }, { status: 404 });
+      return NextResponse.json(
+        { error: "Username and recovery email do not match" },
+        { status: 404 }
+      );
     }
 
     await prisma.passwordResetToken.deleteMany({
-      where: {
-        userId: owner.id,
-      },
+      where: { userId: owner.id },
     });
 
     const token = randomUUID();
+
     await prisma.passwordResetToken.create({
       data: {
         token,
@@ -82,16 +91,34 @@ export async function POST(request: Request) {
     });
   }
 
-  await requireRole(["OWNER"]);
+  /* ---------------- CREATE USER ---------------- */
+
+  const sessionUser = await requireRole(["OWNER", "CO_OWNER"]);
 
   const role = body.role;
-  const parsed = role === "MANAGER" ? managerSchema.safeParse(body) : coOwnerSchema.safeParse(body);
+
+  // Co-owner restriction
+  if (sessionUser.role === "CO_OWNER" && role !== "MANAGER") {
+    return NextResponse.json(
+      { error: "Co-Owners can only create Managers" },
+      { status: 403 }
+    );
+  }
+
+  const parsed =
+    role === "MANAGER"
+      ? managerSchema.safeParse(body)
+      : coOwnerSchema.safeParse(body);
 
   if (!parsed.success) {
-    return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+    return NextResponse.json(
+      { error: parsed.error.issues[0]?.message },
+      { status: 400 }
+    );
   }
 
   const password = await bcrypt.hash(parsed.data.password, 10);
+
   const user = await prisma.user.create({
     data: {
       username: parsed.data.username,
@@ -100,6 +127,7 @@ export async function POST(request: Request) {
       mustChangePassword: false,
       pastDaysAllowed: role === "MANAGER" ? body.pastDaysAllowed : null,
       payRate: role === "MANAGER" ? Number(body.payRate) : null,
+
       assignedStores: {
         createMany: {
           data: parsed.data.storeIds.map((storeId) => ({ storeId })),
@@ -127,23 +155,38 @@ export async function PATCH(request: Request) {
   const intent = searchParams.get("intent");
   const body = await request.json();
 
+  /* ---------------- CHANGE PASSWORD ---------------- */
+
   if (intent === "change-password") {
     const sessionUser = await requireUser();
+
     const parsed = changePasswordSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message },
+        { status: 400 }
+      );
     }
 
-    const user = await prisma.user.findUnique({ where: { id: sessionUser.id } });
+    const user = await prisma.user.findUnique({
+      where: { id: sessionUser.id },
+    });
 
     if (!user) {
       return NextResponse.json({ error: "User not found" }, { status: 404 });
     }
 
-    const valid = await bcrypt.compare(parsed.data.currentPassword, user.password);
+    const valid = await bcrypt.compare(
+      parsed.data.currentPassword,
+      user.password
+    );
+
     if (!valid) {
-      return NextResponse.json({ error: "Current password is incorrect" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Current password is incorrect" },
+        { status: 400 }
+      );
     }
 
     await prisma.user.update({
@@ -156,11 +199,16 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true });
   }
 
+  /* ---------------- OWNER RESET PASSWORD ---------------- */
+
   if (intent === "owner-reset-password") {
     const parsed = setNewPasswordSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid input" }, { status: 400 });
+      return NextResponse.json(
+        { error: parsed.error.issues[0]?.message ?? "Invalid input" },
+        { status: 400 }
+      );
     }
 
     const resetToken = await prisma.passwordResetToken.findUnique({
@@ -168,8 +216,15 @@ export async function PATCH(request: Request) {
       include: { user: true },
     });
 
-    if (!resetToken || resetToken.user.role !== "OWNER" || resetToken.expiresAt < new Date()) {
-      return NextResponse.json({ error: "Reset session is invalid or expired" }, { status: 400 });
+    if (
+      !resetToken ||
+      resetToken.user.role !== "OWNER" ||
+      resetToken.expiresAt < new Date()
+    ) {
+      return NextResponse.json(
+        { error: "Reset session is invalid or expired" },
+        { status: 400 }
+      );
     }
 
     await prisma.user.update({
@@ -186,10 +241,13 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ success: true });
   }
 
-  await requireRole(["OWNER"]);
+  /* ---------------- ADMIN OPERATIONS ---------------- */
+
+  const sessionUser = await requireRole(["OWNER"]);
 
   if (intent === "reset-password") {
     const nextPassword = generateTempPassword();
+
     await prisma.user.update({
       where: { id: body.userId },
       data: {
@@ -202,6 +260,7 @@ export async function PATCH(request: Request) {
   }
 
   const role = body.role;
+
   const existingUser =
     role === "MANAGER"
       ? await prisma.user.findUnique({
@@ -214,8 +273,10 @@ export async function PATCH(request: Request) {
     where: { id: body.userId },
     data: {
       username: body.username,
-      pastDaysAllowed: role === "MANAGER" ? Number(body.pastDaysAllowed) : null,
+      pastDaysAllowed:
+        role === "MANAGER" ? Number(body.pastDaysAllowed) : null,
       payRate: role === "MANAGER" ? Number(body.payRate) : null,
+
       assignedStores: {
         deleteMany: {},
         createMany: {
@@ -225,7 +286,11 @@ export async function PATCH(request: Request) {
     },
   });
 
-  if (role === "MANAGER" && existingUser && existingUser.payRate !== Number(body.payRate)) {
+  if (
+    role === "MANAGER" &&
+    existingUser &&
+    existingUser.payRate !== Number(body.payRate)
+  ) {
     await prisma.payRateHistory.create({
       data: {
         userId: body.userId,
@@ -241,13 +306,20 @@ export async function PATCH(request: Request) {
 
 export async function DELETE(request: Request) {
   await requireRole(["OWNER"]);
+
   const { searchParams } = new URL(request.url);
   const userId = searchParams.get("userId");
 
   if (!userId) {
-    return NextResponse.json({ error: "User id is required" }, { status: 400 });
+    return NextResponse.json(
+      { error: "User id is required" },
+      { status: 400 }
+    );
   }
 
-  await prisma.user.delete({ where: { id: userId } });
+  await prisma.user.delete({
+    where: { id: userId },
+  });
+
   return NextResponse.json({ success: true });
 }

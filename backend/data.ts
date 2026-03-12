@@ -20,6 +20,7 @@ export async function getSettings() {
 }
 
 export async function getStoresForUser(user: {
+  id: string;
   role: string;
   assignedStores: string[];
 }) {
@@ -28,8 +29,10 @@ export async function getStoresForUser(user: {
       user.role === "OWNER"
         ? undefined
         : {
-            id: {
-              in: user.assignedStores,
+            users: {
+              some: {
+                userId: user.id,
+              },
             },
           },
     include: {
@@ -53,6 +56,7 @@ export async function getStoresForUser(user: {
 }
 
 export async function getEmployeesForUser(user: {
+  id: string;
   role: string;
   assignedStores: string[];
 }) {
@@ -61,8 +65,12 @@ export async function getEmployeesForUser(user: {
       user.role === "OWNER"
         ? undefined
         : {
-            storeId: {
-              in: user.assignedStores,
+            store: {
+              users: {
+                some: {
+                  userId: user.id,
+                },
+              },
             },
           },
     include: {
@@ -79,6 +87,7 @@ export async function getEmployeesForUser(user: {
 }
 
 export async function getAttendanceForUser(user: {
+  id: string;
   role: string;
   assignedStores: string[];
 }) {
@@ -87,8 +96,12 @@ export async function getAttendanceForUser(user: {
       user.role === "OWNER"
         ? undefined
         : {
-            storeId: {
-              in: user.assignedStores,
+            store: {
+              users: {
+                some: {
+                  userId: user.id,
+                },
+              },
             },
           },
     include: {
@@ -106,29 +119,48 @@ export async function getAttendanceForUser(user: {
   });
 }
 
-export async function getUserManagementData() {
+export async function getUserManagementData(user: {
+  role: string;
+  assignedStores: string[];
+}) {
   return prisma.user.findMany({
     where: {
       role: {
         in: ["CO_OWNER", "MANAGER"],
       },
+
+      ...(user.role === "OWNER"
+        ? {}
+        : {
+            assignedStores: {
+              some: {
+                storeId: {
+                  in: user.assignedStores,
+                },
+              },
+            },
+          }),
     },
+
     select: {
       id: true,
       username: true,
       role: true,
       pastDaysAllowed: true,
       payRate: true,
+
       assignedStores: {
         include: {
           store: true,
         },
       },
+
       payRateHistory: {
         orderBy: [{ effectiveDate: "desc" }, { createdAt: "desc" }],
         take: 1,
       },
     },
+
     orderBy: {
       createdAt: "asc",
     },
@@ -136,6 +168,7 @@ export async function getUserManagementData() {
 }
 
 export async function getManagerWorkersForUser(user: {
+  id: string;
   role: string;
   assignedStores: string[];
 }) {
@@ -165,14 +198,21 @@ export async function getManagerWorkersForUser(user: {
 
 export async function getPayrollForUser(
   user: {
+    id: string;
     role: string;
     assignedStores: string[];
   },
   from?: string,
   to?: string,
 ) {
-  const start = from ? startOfDay(parseDateOnly(from)) : startOfDay(subDays(new Date(), 13));
-  const end = to ? endOfDay(parseDateOnly(to)) : endOfDay(addDays(start, 13));
+  const start = from
+    ? startOfDay(parseDateOnly(from))
+    : startOfDay(subDays(new Date(), 13));
+
+  const end = to
+    ? endOfDay(parseDateOnly(to))
+    : endOfDay(addDays(start, 13));
+
   const payPeriodStart = from ?? format(start, "yyyy-MM-dd");
   const payPeriodEnd = to ?? format(end, "yyyy-MM-dd");
 
@@ -185,8 +225,12 @@ export async function getPayrollForUser(
       ...(user.role === "OWNER"
         ? {}
         : {
-            storeId: {
-              in: user.assignedStores,
+            store: {
+              users: {
+                some: {
+                  userId: user.id,
+                },
+              },
             },
           }),
     },

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Filter, Search } from "lucide-react";
+import { Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
 import { Input } from "@/frontend/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
@@ -23,45 +23,55 @@ type PayrollRow = {
 type PayrollClientProps = {
   stores: Array<{ id: string; name: string }>;
   payroll: PayrollRow[];
-  defaultFrom: string;
-  defaultTo: string;
 };
+
+function formatLocalDate(date: Date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
 
 function getPreviousSaturday() {
   const today = new Date();
-  const day = today.getDay(); // 0 = Sunday, 6 = Saturday
-
+  const day = today.getDay();
   const diff = day >= 6 ? day - 6 : day + 1;
+
   const prevSaturday = new Date(today);
   prevSaturday.setDate(today.getDate() - diff);
 
-  return prevSaturday.toISOString().split("T")[0];
+  return formatLocalDate(prevSaturday);
 }
 
 function getToday() {
-  return new Date().toISOString().split("T")[0];
+  return formatLocalDate(new Date());
 }
 
 function formatHours(hours: number) {
   const wholeHours = Math.floor(hours);
   const minutes = Math.round((hours - wholeHours) * 60);
-
   return `${hours.toFixed(2)}h (${wholeHours} hrs ${minutes} min)`;
 }
 
-export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: PayrollClientProps) {
+export function PayrollClient({ stores, payroll }: PayrollClientProps) {
+
   const [rows, setRows] = useState(payroll);
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("all");
+
   const [fromDate, setFromDate] = useState(getPreviousSaturday());
   const [toDate, setToDate] = useState(getToday());
+
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+
     let active = true;
 
     async function loadPayroll() {
+
       setLoading(true);
+
       const params = new URLSearchParams({
         from: fromDate,
         to: toDate,
@@ -70,9 +80,7 @@ export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: Payro
       const response = await fetch(`/api/payroll?${params.toString()}`);
       const data = await response.json();
 
-      if (!active) {
-        return;
-      }
+      if (!active) return;
 
       if (response.ok) {
         setRows(data);
@@ -81,150 +89,172 @@ export function PayrollClient({ stores, payroll, defaultFrom, defaultTo }: Payro
       setLoading(false);
     }
 
-    void loadPayroll();
+    loadPayroll();
 
     return () => {
       active = false;
     };
+
   }, [fromDate, toDate]);
 
-  const filtered = useMemo(
-    () =>
-      rows.filter((row) => {
-        const matchesSearch = row.workerName.toLowerCase().includes(search.toLowerCase());
-        const matchesStore = storeFilter === "all" || row.storeId === storeFilter;
-        return matchesSearch && matchesStore;
-      }),
-    [rows, search, storeFilter],
+  const filtered = useMemo(() =>
+    rows.filter((row) => {
+
+      const matchesSearch = row.workerName
+        .toLowerCase()
+        .includes(search.toLowerCase());
+
+      const matchesStore =
+        storeFilter === "all" || row.storeId === storeFilter;
+
+      return matchesSearch && matchesStore;
+
+    }),
+    [rows, search, storeFilter]
   );
 
   const payPeriodLabel = `${formatDate(fromDate)} - ${formatDate(toDate)}`;
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-3xl font-semibold tracking-tight text-slate-900">Payroll</h2>
-        <p className="mt-2 text-base text-slate-500">Manage payroll and view employee compensation.</p>
-      </div>
 
-      <Card className="overflow-hidden">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4 rounded-2xl border bg-slate-50/70 p-5 xl:flex-row xl:items-center">
-            <div className="flex items-center gap-3 text-base font-semibold text-slate-700">
-              <Filter className="h-5 w-5 text-slate-500" />
-              Filters:
-            </div>
-            <div className="grid flex-1 gap-3 md:grid-cols-2 xl:grid-cols-[280px_230px_24px_230px_minmax(240px,1fr)]">
-              <Select value={storeFilter} onValueChange={setStoreFilter}>
-                <SelectTrigger className="h-12 rounded-2xl bg-white text-sm">
-                  <SelectValue placeholder="All stores" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All stores</SelectItem>
-                  {stores.map((store) => (
-                    <SelectItem key={store.id} value={store.id}>
-                      {store.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+    <Card>
 
-              <Input
-                type="date"
-                className="h-12 rounded-2xl bg-white text-sm"
-                value={fromDate}
-                onChange={(event) => setFromDate(event.target.value)}
-                max={toDate}
-              />
+      {/* HEADER (same layout as Employees page) */}
+      <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
 
-              <div className="hidden items-center justify-center text-base font-semibold text-slate-400 xl:flex">to</div>
+        <div>
+          <CardTitle>Payroll</CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Manage payroll and view employee compensation.
+          </p>
+        </div>
 
-              <Input
-                type="date"
-                className="h-12 rounded-2xl bg-white text-sm"
-                value={toDate}
-                onChange={(event) => setToDate(event.target.value)}
-                min={fromDate}
-              />
+        <div className="flex flex-wrap items-center gap-3">
 
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-4 top-4 h-5 w-5 text-slate-400" />
-                <Input
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
-                  placeholder="Search by employee name"
-                  className="h-12 rounded-2xl bg-white pl-12 text-sm"
-                />
-              </div>
-            </div>
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+
+            <Input
+              placeholder="Search employee"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 w-[200px]"
+            />
           </div>
-        </CardContent>
-      </Card>
 
-      <Card className="overflow-hidden">
-        <CardHeader className="border-b bg-slate-50/60">
-          <CardTitle className="text-base font-semibold text-slate-600">Pay period: {payPeriodLabel}</CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {loading ? (
-            <div className="space-y-3 p-6">
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-              <Skeleton className="h-14 w-full" />
-            </div>
-          ) : (
-            <div className="table-scroll overflow-x-auto">
-              <table className="min-w-full text-sm">
-                <thead className="border-b bg-white text-left uppercase tracking-[0.18em] text-slate-400">
-                  <tr>
-                            <th className="px-10 py-5 font-semibold">Worker</th>
-                    <th className="px-6 py-5 font-semibold">Store</th>
-                    <th className="px-6 py-5 font-semibold">Pay Period</th>
-                    <th className="px-6 py-5 font-semibold">Total Hours</th>
-                    <th className="px-6 py-5 font-semibold">Pay Rate</th>
-                    <th className="px-6 py-5 font-semibold">Total Pay</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-14 text-center text-base text-slate-500">
-                        No payroll records found for this filter range.
+          <Select value={storeFilter} onValueChange={setStoreFilter}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="All stores" />
+            </SelectTrigger>
+
+            <SelectContent>
+              <SelectItem value="all">All stores</SelectItem>
+
+              {stores.map((store) => (
+                <SelectItem key={store.id} value={store.id}>
+                  {store.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Input
+            type="date"
+            value={fromDate}
+            max={toDate}
+            onChange={(e) => setFromDate(e.target.value)}
+          />
+
+          <Input
+            type="date"
+            value={toDate}
+            min={fromDate}
+            max={getToday()}
+            onChange={(e) => setToDate(e.target.value)}
+          />
+
+        </div>
+
+      </CardHeader>
+
+      {/* TABLE */}
+      <CardContent className="p-0">
+
+        <div className="border-b bg-slate-50 px-6 py-3 text-sm font-medium text-slate-600">
+          Pay period: {payPeriodLabel}
+        </div>
+
+        {loading ? (
+
+          <div className="space-y-3 p-6">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
+
+        ) : (
+
+          <div className="overflow-x-auto">
+
+            <table className="min-w-full text-sm">
+
+              <thead className="border-b bg-white text-left text-slate-400 uppercase tracking-wide">
+                <tr>
+                  <th className="px-6 py-4">Worker</th>
+                  <th className="px-6 py-4">Store</th>
+                  <th className="px-6 py-4">Pay Period</th>
+                  <th className="px-6 py-4">Total Hours</th>
+                  <th className="px-6 py-4">Pay Rate</th>
+                  <th className="px-6 py-4">Total Pay</th>
+                </tr>
+              </thead>
+
+              <tbody>
+
+                {filtered.map((row) => {
+
+                  const [from, to] = row.payPeriod.split("|");
+
+                  return (
+
+                    <tr key={`${row.workerId}-${row.storeId}`} className="border-b">
+
+                      <td className="px-6 py-4 font-medium">{row.workerName}</td>
+
+                      <td className="px-6 py-4">{row.storeName}</td>
+
+                      <td className="px-6 py-4">
+                        {formatDate(from)} - {formatDate(to)}
                       </td>
-                    </tr>
-                  ) : (
-                    filtered.map((row) => {
-                      const [from, to] = row.payPeriod.split("|");
 
-                      return (
-                        <tr key={`${row.workerId}-${row.storeId}`} className="border-b last:border-b-0">
-                          <td className="px-10 py-6 text-lg font-semibold text-slate-900">
-                            {row.workerName}
-                            {row.workerType === "MANAGER" ? (
-                              <span className="ml-2 rounded-full bg-blue-50 px-2 py-1 text-xs font-medium text-primary">Manager</span>
-                            ) : null}
-                          </td>
-                          <td className="px-6 py-6 text-lg text-slate-600">{row.storeName}</td>
-                          <td className="px-6 py-6 text-lg text-slate-600">
-                            {formatDate(from)} - {formatDate(to)}
-                          </td>
-                          <td className="px-6 py-6 text-lg text-slate-900">
-                            {formatHours(row.totalHours)}
-                          </td>
-                          <td className="px-6 py-6 text-lg text-slate-900">
-                            {row.payRate == null ? "Varies" : `$${row.payRate.toFixed(2)}`}
-                          </td>
-                          <td className="px-6 py-6 text-lg font-semibold text-slate-900">${row.totalPay.toFixed(2)}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+                      <td className="px-6 py-4">
+                        {formatHours(row.totalHours)}
+                      </td>
+
+                      <td className="px-6 py-4">
+                        {row.payRate == null ? "Varies" : `$${row.payRate.toFixed(2)}`}
+                      </td>
+
+                      <td className="px-6 py-4 font-semibold">
+                        ${row.totalPay.toFixed(2)}
+                      </td>
+
+                    </tr>
+
+                  );
+
+                })}
+
+              </tbody>
+
+            </table>
+
+          </div>
+
+        )}
+
+      </CardContent>
+
+    </Card>
+
   );
 }

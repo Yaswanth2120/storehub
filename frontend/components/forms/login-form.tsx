@@ -87,10 +87,9 @@ export function LoginForm() {
         <div className="rounded-xl border bg-slate-50 p-4 text-sm">
           <p className="font-semibold">Demo credentials</p>
           <div className="mt-3 space-y-1 text-muted-foreground">
-            <p>`owner / owner123`</p>
-            <p>`coowner1 / temp123`</p>
-            <p>`sarah.j / temp123`</p>
-            <p>`michael.c / manager123`</p>
+            <p>`Sapin / Owner123`</p>
+            <p>`Rochan / Coowner123`</p>
+            <p>`Manager1 / Manager123`</p>
           </div>
         </div>
       </CardContent>

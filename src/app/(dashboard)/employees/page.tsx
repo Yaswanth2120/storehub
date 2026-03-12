@@ -6,42 +6,34 @@ import { ROLE_LABELS } from "@/backend/constants";
 
 export default async function EmployeesPage() {
   const user = await requireUser();
+
   const [employees, stores, managementUsers] = await Promise.all([
     getEmployeesForUser(user),
     getStoresForUser(user),
+
     prisma.user.findMany({
       where:
         user.role === "OWNER"
-          ? undefined
-          : user.role === "CO_OWNER"
-            ? {
-                OR: [
-                  { id: user.id },
-                  {
-                    assignedStores: {
-                      some: {
-                        storeId: {
-                          in: user.assignedStores,
+          ? { role: { in: ["OWNER", "CO_OWNER", "MANAGER"] } }
+          : {
+              OR: [
+                { id: user.id },
+                {
+                  assignedStores: {
+                    some: {
+                      store: {
+                        users: {
+                          some: {
+                            userId: user.id,
+                          },
                         },
                       },
                     },
                   },
-                ],
-              }
-            : {
-                OR: [
-                  { id: user.id },
-                  {
-                    assignedStores: {
-                      some: {
-                        storeId: {
-                          in: user.assignedStores,
-                        },
-                      },
-                    },
-                  },
-                ],
-              },
+                },
+              ],
+            },
+
       select: {
         id: true,
         username: true,
@@ -57,6 +49,7 @@ export default async function EmployeesPage() {
           take: 1,
         },
       },
+
       orderBy: {
         createdAt: "asc",
       },
@@ -75,6 +68,7 @@ export default async function EmployeesPage() {
       storeNames: [employee.store.name],
       roleLabel: "Employee",
     })),
+
     ...managementUsers.map((person) => ({
       id: `user-${person.id}`,
       name: person.username,
@@ -94,7 +88,10 @@ export default async function EmployeesPage() {
   return (
     <EmployeesClient
       role={user.role}
-      stores={stores.map((store) => ({ id: store.id, name: store.name }))}
+      stores={stores.map((store) => ({
+        id: store.id,
+        name: store.name,
+      }))}
       employees={personnel}
     />
   );

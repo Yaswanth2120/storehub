@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/frontend/components/ui/tabs";
 
 type UsersClientProps = {
+  role: "OWNER" | "CO_OWNER";
   stores: Array<{ id: string; name: string }>;
   users: Array<{
     id: string;
@@ -28,13 +29,21 @@ type UsersClientProps = {
   }>;
 };
 
-export function UsersClient({ stores, users }: UsersClientProps) {
+export function UsersClient({ role, stores, users }: UsersClientProps) {
   const router = useRouter();
-  const [tab, setTab] = useState("CO_OWNER");
-  const filtered = useMemo(() => users.filter((user) => user.role === tab), [tab, users]);
+
+  const defaultTab = role === "OWNER" ? "CO_OWNER" : "MANAGER";
+  const [tab, setTab] = useState(defaultTab);
+
+  const filtered = useMemo(
+    () => users.filter((user) => user.role === tab),
+    [tab, users]
+  );
 
   async function deleteUser(userId: string) {
-    const response = await fetch(`/api/users?userId=${userId}`, { method: "DELETE" });
+    const response = await fetch(`/api/users?userId=${userId}`, {
+      method: "DELETE",
+    });
     const data = await response.json();
 
     if (!response.ok) {
@@ -51,20 +60,30 @@ export function UsersClient({ stores, users }: UsersClientProps) {
       <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <CardTitle>User Management</CardTitle>
-          <p className="text-sm text-muted-foreground">Create co-owner and manager access with store-level permissions.</p>
+          <p className="text-sm text-muted-foreground">
+            Create co-owner and manager access with store-level permissions.
+          </p>
         </div>
-        {tab === "CO_OWNER" ? (
+
+        {/* Button logic */}
+        {role === "OWNER" && tab === "CO_OWNER" && (
           <AddUserModal role="CO_OWNER" triggerLabel="Add Co-Owner" stores={stores} />
-        ) : (
-          <AddUserModal role="MANAGER" triggerLabel="Add Manager" stores={stores} />
         )}
+
+        {(role === "OWNER" && tab === "MANAGER") || role === "CO_OWNER" ? (
+          <AddUserModal role="MANAGER" triggerLabel="Add Manager" stores={stores} />
+        ) : null}
       </CardHeader>
+
       <CardContent>
         <Tabs value={tab} onValueChange={setTab}>
           <TabsList>
-            <TabsTrigger value="CO_OWNER">Co-Owners</TabsTrigger>
+            {role === "OWNER" && (
+              <TabsTrigger value="CO_OWNER">Co-Owners</TabsTrigger>
+            )}
             <TabsTrigger value="MANAGER">Managers</TabsTrigger>
           </TabsList>
+
           <TabsContent value={tab}>
             <div className="table-scroll overflow-x-auto rounded-xl border">
               <table className="min-w-full text-sm">
@@ -72,24 +91,45 @@ export function UsersClient({ stores, users }: UsersClientProps) {
                   <tr>
                     <th className="px-4 py-3 font-medium">Username</th>
                     <th className="px-4 py-3 font-medium">Assigned Stores</th>
-                    {tab === "MANAGER" ? <th className="px-4 py-3 font-medium">Past Days Allowed</th> : null}
-                    {tab === "MANAGER" ? <th className="px-4 py-3 font-medium">Pay Rate</th> : null}
+                    {tab === "MANAGER" && (
+                      <th className="px-4 py-3 font-medium">Past Days Allowed</th>
+                    )}
+                    {tab === "MANAGER" && (
+                      <th className="px-4 py-3 font-medium">Pay Rate</th>
+                    )}
                     <th className="px-4 py-3 font-medium">Actions</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {filtered.map((user) => (
                     <tr key={user.id} className="border-t">
-                      <td className="px-4 py-3 font-medium">{user.username}</td>
+                      <td className="px-4 py-3 font-medium">
+                        {user.username}
+                      </td>
+
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           {user.assignedStores.map((entry) => (
-                            <Badge key={entry.store.id}>{entry.store.name}</Badge>
+                            <Badge key={entry.store.id}>
+                              {entry.store.name}
+                            </Badge>
                           ))}
                         </div>
                       </td>
-                      {tab === "MANAGER" ? <td className="px-4 py-3">{user.pastDaysAllowed}</td> : null}
-                      {tab === "MANAGER" ? <td className="px-4 py-3">${(user.payRate ?? 0).toFixed(2)}</td> : null}
+
+                      {tab === "MANAGER" && (
+                        <td className="px-4 py-3">
+                          {user.pastDaysAllowed}
+                        </td>
+                      )}
+
+                      {tab === "MANAGER" && (
+                        <td className="px-4 py-3">
+                          ${(user.payRate ?? 0).toFixed(2)}
+                        </td>
+                      )}
+
                       <td className="px-4 py-3">
                         <div className="flex flex-wrap gap-2">
                           <AddUserModal
@@ -101,25 +141,40 @@ export function UsersClient({ stores, users }: UsersClientProps) {
                               username: user.username,
                               pastDaysAllowed: user.pastDaysAllowed,
                               payRate: user.payRate,
-                              storeIds: user.assignedStores.map((entry) => entry.store.id),
+                              storeIds: user.assignedStores.map(
+                                (entry) => entry.store.id
+                              ),
                             }}
                           />
-                          {user.role === "MANAGER" && (user.payRate ?? 0) > 0 ? (
+
+                          {user.role === "MANAGER" &&
+                          (user.payRate ?? 0) > 0 ? (
                             <ChangePayRateModal
                               workerId={user.id}
                               workerType="MANAGER"
                               workerName={user.username}
                               currentPayRate={user.payRate ?? 0}
-                              latestPayHistory={user.payRateHistory?.[0] ?? null}
+                              latestPayHistory={
+                                user.payRateHistory?.[0] ?? null
+                              }
                             />
                           ) : null}
+
                           <ResetPasswordModal userId={user.id} />
-                          <Button variant="destructive" size="sm" onClick={() => deleteUser(user.id)}>Delete</Button>
+
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            onClick={() => deleteUser(user.id)}
+                          >
+                            Delete
+                          </Button>
                         </div>
                       </td>
                     </tr>
                   ))}
                 </tbody>
+
               </table>
             </div>
           </TabsContent>
