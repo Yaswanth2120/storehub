@@ -1,20 +1,33 @@
 import { expect, Page } from "@playwright/test";
 
-export async function loginByApi(page: Page, username: string, password: string) {
-  const csrfResponse = await page.request.get("/api/auth/csrf");
-  expect(csrfResponse.ok()).toBeTruthy();
+const demoCredentials = new Map(
+  (process.env.STAGING_DEMO_CREDENTIALS ?? "")
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => {
+      const separatorIndex = entry.indexOf(":");
 
-  const { csrfToken } = (await csrfResponse.json()) as { csrfToken: string };
-  const response = await page.request.post("/api/auth/callback/credentials", {
-    form: {
-      csrfToken,
-      username,
-      password,
-      callbackUrl: "http://localhost:3100/stores",
-      json: "true",
-    },
-  });
+      if (separatorIndex === -1) {
+        return null;
+      }
 
-  expect(response.ok()).toBeTruthy();
-  await page.goto("/stores");
+      return [
+        entry.slice(0, separatorIndex).trim(),
+        entry.slice(separatorIndex + 1).trim(),
+      ] as const;
+    })
+    .filter((entry): entry is readonly [string, string] => Boolean(entry?.[0] && entry?.[1])),
+);
+
+export function getPasswordForUser(username: string, fallbackPassword: string) {
+  return demoCredentials.get(username) ?? fallbackPassword;
+}
+
+export async function loginByApi(page: Page, username: string, password?: string) {
+  await page.goto("/login");
+  await page.getByPlaceholder("Enter username").fill(username);
+  await page.getByPlaceholder("Enter password").fill(getPasswordForUser(username, password ?? ""));
+  await page.getByRole("button", { name: "Sign In" }).click();
+  await expect(page).toHaveURL(/\/stores$/);
 }

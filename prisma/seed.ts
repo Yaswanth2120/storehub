@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { set, subDays } from "date-fns";
+import { startOfDay, subDays, subWeeks } from "date-fns";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
@@ -14,8 +14,9 @@ async function main() {
   await prisma.user.deleteMany();
   await prisma.systemSettings.deleteMany();
 
-  const [ownerPassword, tempPassword, managerPassword] = await Promise.all([
+  const [ownerPassword, coOwnerPassword, tempPassword, managerPassword] = await Promise.all([
     bcrypt.hash("owner123", 10),
+    bcrypt.hash("coowner123", 10),
     bcrypt.hash("temp123", 10),
     bcrypt.hash("manager123", 10),
   ]);
@@ -39,7 +40,7 @@ async function main() {
   const coOwner = await prisma.user.create({
     data: {
       username: "coowner1",
-      password: tempPassword,
+      password: coOwnerPassword,
       role: "CO_OWNER",
       mustChangePassword: false,
     },
@@ -91,8 +92,18 @@ async function main() {
     }),
   ]);
 
-  const emmaRaiseDate = subDays(new Date(), 2);
-  const sarahRaiseDate = subDays(new Date(), 1);
+  const today = new Date();
+  const currentWeekStart = (() => {
+    const weekStart = new Date(today);
+    const day = weekStart.getDay();
+    const diff = day >= 6 ? day - 6 : day + 1;
+    weekStart.setHours(0, 0, 0, 0);
+    weekStart.setDate(weekStart.getDate() - diff);
+    return weekStart;
+  })();
+
+  const emmaRaiseDate = currentWeekStart;
+  const sarahRaiseDate = currentWeekStart;
 
   await prisma.payRateHistory.createMany({
     data: [
@@ -106,19 +117,19 @@ async function main() {
         employeeId: employees[1].id,
         oldPayRate: null,
         newPayRate: 19,
-        effectiveDate: subDays(new Date(), 30),
+        effectiveDate: subDays(today, 30),
       },
       {
         employeeId: employees[2].id,
         oldPayRate: null,
         newPayRate: 20,
-        effectiveDate: subDays(new Date(), 30),
+        effectiveDate: subDays(today, 30),
       },
       {
         employeeId: employees[3].id,
         oldPayRate: null,
         newPayRate: 17.5,
-        effectiveDate: subDays(new Date(), 30),
+        effectiveDate: subDays(today, 30),
       },
       {
         userId: sarah.id,
@@ -130,61 +141,62 @@ async function main() {
         userId: michael.id,
         oldPayRate: null,
         newPayRate: 22.5,
-        effectiveDate: subDays(new Date(), 30),
+        effectiveDate: subDays(today, 30),
       },
     ],
   });
 
-  const attendanceData = Array.from({ length: 7 }).flatMap((_, index) => {
-    const date = subDays(new Date(), index);
-    const workDate = set(date, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 });
-    const emmaPayRate = workDate >= set(emmaRaiseDate, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 }) ? 18.5 : 17;
-    const sarahPayRate = workDate >= set(sarahRaiseDate, { hours: 0, minutes: 0, seconds: 0, milliseconds: 0 }) ? 21 : 20;
+  const weekStarts = [currentWeekStart, subWeeks(currentWeekStart, 1), subWeeks(currentWeekStart, 2), subWeeks(currentWeekStart, 3)];
+
+  const attendanceData = weekStarts.flatMap((weekStart, index) => {
+    const workWeekStart = startOfDay(weekStart);
+    const emmaPayRate = workWeekStart >= startOfDay(emmaRaiseDate) ? 18.5 : 17;
+    const sarahPayRate = workWeekStart >= startOfDay(sarahRaiseDate) ? 21 : 20;
 
     return [
       {
         employeeId: employees[0].id,
         storeId: stores[0].id,
-        date: workDate,
-        clockIn: "09:00",
-        clockOut: "17:00",
-        totalHours: 8,
+        date: workWeekStart,
+        clockIn: "00:00",
+        clockOut: "00:00",
+        totalHours: [48, 46, 44, 42][index] ?? 40,
         payRateSnapshot: emmaPayRate,
       },
       {
         employeeId: employees[1].id,
         storeId: stores[0].id,
-        date: workDate,
-        clockIn: "10:00",
-        clockOut: "18:30",
-        totalHours: 8.5,
+        date: workWeekStart,
+        clockIn: "00:00",
+        clockOut: "00:00",
+        totalHours: [51, 49, 47, 46][index] ?? 45,
         payRateSnapshot: 19,
       },
       {
         employeeId: employees[2].id,
         storeId: stores[1].id,
-        date: workDate,
-        clockIn: "08:30",
-        clockOut: "16:30",
-        totalHours: 8,
+        date: workWeekStart,
+        clockIn: "00:00",
+        clockOut: "00:00",
+        totalHours: [45, 44, 43, 42][index] ?? 40,
         payRateSnapshot: 20,
       },
       {
         userId: sarah.id,
         storeId: stores[0].id,
-        date: workDate,
-        clockIn: "12:00",
-        clockOut: "18:00",
-        totalHours: 6,
+        date: workWeekStart,
+        clockIn: "00:00",
+        clockOut: "00:00",
+        totalHours: [18, 16, 14, 12][index] ?? 10,
         payRateSnapshot: sarahPayRate,
       },
       {
         userId: michael.id,
         storeId: stores[1].id,
-        date: workDate,
-        clockIn: "11:00",
-        clockOut: "17:00",
-        totalHours: 6,
+        date: workWeekStart,
+        clockIn: "00:00",
+        clockOut: "00:00",
+        totalHours: [20, 19, 18, 17][index] ?? 15,
         payRateSnapshot: 22.5,
       },
     ];

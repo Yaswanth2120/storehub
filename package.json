@@ -10,6 +10,7 @@
     "test": "npm run test:unit && npm run test:e2e",
     "test:unit": "jest --runInBand",
     "test:e2e": "npm run build && playwright test",
+    "test:e2e:reset": "npx prisma db seed && npm run build && playwright test",
     "prisma:generate": "prisma generate",
     "prisma:push": "prisma db push",
     "prisma:seed": "prisma db seed",

@@ -20,21 +20,21 @@ export function Sidebar({ role, mobile = false, onNavigate }: SidebarProps) {
   return (
     <aside
       className={cn(
-        "flex h-full flex-col border-r border-sidebar-border bg-sidebar",
+        "flex h-full flex-col border-r border-sidebar-border bg-sidebar/95 backdrop-blur",
         mobile ? "w-full max-w-xs" : "hidden w-72 lg:flex",
       )}
     >
-      <div className="flex h-20 items-center gap-3 border-b border-sidebar-border px-6">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-lg font-bold text-primary-foreground">
+      <div className="flex h-24 items-center gap-4 border-b border-sidebar-border px-6">
+        <div className="flex h-12 w-12 items-center justify-center rounded-[18px] bg-[#e9f1ff] text-lg font-semibold text-[#0071e3]">
           S
         </div>
         <div>
-          <p className="text-lg font-semibold">StoreHub</p>
-          <p className="text-xs text-muted-foreground">Operations command center</p>
+          <p className="text-[1.15rem] font-semibold tracking-[-0.02em] text-[#1d1d1f]">StoreHub</p>
+          <p className="text-xs text-[#6e6e73]">Operations command center</p>
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-4 py-6">
+      <nav className="flex-1 space-y-1.5 px-4 py-6">
         {navItems.map((item) => {
           const active = pathname === item.href;
           const Icon = item.icon;
@@ -45,10 +45,10 @@ export function Sidebar({ role, mobile = false, onNavigate }: SidebarProps) {
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium transition-colors",
+                "flex items-center gap-3 rounded-2xl px-4 py-3 text-sm font-medium tracking-[-0.01em] transition-all",
                 active
-                  ? "bg-primary text-primary-foreground shadow-sm"
-                  : "text-sidebar-foreground hover:bg-white",
+                  ? "bg-white text-[#0071e3] shadow-sm"
+                  : "text-sidebar-foreground hover:bg-white/80",
               )}
             >
               <Icon className="h-4 w-4" />

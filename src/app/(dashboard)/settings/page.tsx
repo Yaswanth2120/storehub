@@ -12,7 +12,7 @@ export default async function SettingsPage() {
       readOnly={user.role !== "OWNER"}
       settings={{
         companyName: settings.companyName,
-        recoveryEmail: settings.recoveryEmail ?? "",
+        recoveryEmail: user.role === "OWNER" ? settings.recoveryEmail ?? "" : "",
         timezone: settings.timezone,
         notes: settings.notes ?? "",
       }}

@@ -19,7 +19,8 @@ import {
 } from "@/frontend/components/ui/dialog";
 import { Input } from "@/frontend/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
-import { formatDate } from "@/lib/utils";
+import { WeekRangePicker } from "@/frontend/components/ui/week-range-picker";
+import { formatDate, formatLocalDate, getCurrentWeekStart, getWeekOptionsWindow } from "@/lib/utils";
 
 type ChangePayRateModalProps = {
   triggerLabel?: string;
@@ -35,9 +36,9 @@ type ChangePayRateModalProps = {
 };
 
 const APPLY_OPTIONS = [
-  { value: "FUTURE_ONLY", label: "Future dates only" },
-  { value: "DATE_RANGE", label: "Selected date range" },
-  { value: "ONE_DAY", label: "One specific day" },
+  { value: "FUTURE_ONLY", label: "Future weeks only" },
+  { value: "DATE_RANGE", label: "Selected weekly range" },
+  { value: "ONE_DAY", label: "One specific week" },
   { value: "ALL_RECORDS", label: "All previous and future records" },
 ] as const;
 
@@ -75,6 +76,8 @@ export function ChangePayRateModal({
   });
 
   const applyMode = watch("applyMode");
+  const weekOptions = useMemo(() => getWeekOptionsWindow(24, 12), []);
+  const defaultWeekStart = useMemo(() => formatLocalDate(getCurrentWeekStart()), []);
   const warningText = useMemo(
     () => `This will overwrite the saved pay rate on all existing attendance records for ${workerName} and update the current rate going forward.`,
     [workerName],
@@ -151,8 +154,12 @@ export function ChangePayRateModal({
 
           {applyMode === "FUTURE_ONLY" ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Effective Start Date</label>
-              <Input type="date" {...register("effectiveStartDate")} />
+              <label className="text-sm font-medium">Effective Start Week</label>
+              <WeekRangePicker
+                options={weekOptions}
+                value={watch("effectiveStartDate") || defaultWeekStart}
+                onChange={(value) => setValue("effectiveStartDate", value, { shouldValidate: true })}
+              />
               {errors.effectiveStartDate ? <p className="text-xs text-destructive">{errors.effectiveStartDate.message}</p> : null}
             </div>
           ) : null}
@@ -160,13 +167,21 @@ export function ChangePayRateModal({
           {applyMode === "DATE_RANGE" ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
-                <label className="text-sm font-medium">Start Date</label>
-                <Input type="date" {...register("startDate")} />
+                <label className="text-sm font-medium">Start Week</label>
+                <WeekRangePicker
+                  options={weekOptions}
+                  value={watch("startDate") || defaultWeekStart}
+                  onChange={(value) => setValue("startDate", value, { shouldValidate: true })}
+                />
                 {errors.startDate ? <p className="text-xs text-destructive">{errors.startDate.message}</p> : null}
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">End Date</label>
-                <Input type="date" {...register("endDate")} />
+                <label className="text-sm font-medium">End Week</label>
+                <WeekRangePicker
+                  options={weekOptions}
+                  value={watch("endDate") || defaultWeekStart}
+                  onChange={(value) => setValue("endDate", value, { shouldValidate: true })}
+                />
                 {errors.endDate ? <p className="text-xs text-destructive">{errors.endDate.message}</p> : null}
               </div>
             </div>
@@ -174,8 +189,12 @@ export function ChangePayRateModal({
 
           {applyMode === "ONE_DAY" ? (
             <div className="space-y-2">
-              <label className="text-sm font-medium">Date</label>
-              <Input type="date" {...register("date")} />
+              <label className="text-sm font-medium">Week</label>
+              <WeekRangePicker
+                options={weekOptions}
+                value={watch("date") || defaultWeekStart}
+                onChange={(value) => setValue("date", value, { shouldValidate: true })}
+              />
               {errors.date ? <p className="text-xs text-destructive">{errors.date.message}</p> : null}
             </div>
           ) : null}

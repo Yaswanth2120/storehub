@@ -63,7 +63,7 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)",
       },
       boxShadow: {
-        card: "0 20px 45px -25px rgba(15, 23, 42, 0.22)",
+        card: "0 24px 60px -34px rgba(29, 29, 31, 0.24)",
       },
     },
   },

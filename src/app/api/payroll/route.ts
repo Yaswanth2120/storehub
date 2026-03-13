@@ -7,6 +7,13 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const from = searchParams.get("from") ?? undefined;
   const to = searchParams.get("to") ?? undefined;
-  const payroll = await getPayrollForUser(user, from, to);
+  const periodType = searchParams.get("periodType") as "WEEKLY" | "BI_WEEKLY" | null;
+  const periodStart = searchParams.get("periodStart") ?? undefined;
+  const payroll = await getPayrollForUser(user, {
+    from,
+    to,
+    periodType: periodType ?? undefined,
+    periodStart,
+  });
   return NextResponse.json(payroll);
 }

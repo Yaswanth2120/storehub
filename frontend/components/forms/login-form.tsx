@@ -16,7 +16,11 @@ import { loginSchema } from "@/backend/validations";
 
 type LoginValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+type LoginFormProps = {
+  demoCredentials?: Array<{ username: string; password: string }>;
+};
+
+export function LoginForm({ demoCredentials = [] }: LoginFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const {
@@ -84,14 +88,16 @@ export function LoginForm() {
           </Button>
         </form>
 
-        <div className="rounded-xl border bg-slate-50 p-4 text-sm">
-          <p className="font-semibold">Demo credentials</p>
-          <div className="mt-3 space-y-1 text-muted-foreground">
-            <p>`Sapin / Owner123`</p>
-            <p>`Rochan / Coowner123`</p>
-            <p>`Manager1 / Manager123`</p>
+        {demoCredentials.length ? (
+          <div className="rounded-xl border bg-slate-50 p-4 text-sm">
+            <p className="font-semibold">Demo credentials</p>
+            <div className="mt-3 space-y-1 text-muted-foreground">
+              {demoCredentials.map((credential) => (
+                <p key={credential.username}>{` \`${credential.username} / ${credential.password}\``}</p>
+              ))}
+            </div>
           </div>
-        </div>
+        ) : null}
       </CardContent>
     </Card>
   );

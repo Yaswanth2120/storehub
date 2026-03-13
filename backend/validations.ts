@@ -57,9 +57,7 @@ export const attendanceSchema = z.object({
   workerId: z.string().min(1, "Worker is required"),
   workerType: z.enum(["EMPLOYEE", "MANAGER"]),
   storeId: z.string().min(1, "Store is required"),
-  date: z.string().min(1, "Date is required"),
-  clockIn: z.string().min(1, "Clock in is required"),
-  clockOut: z.string().min(1, "Clock out is required"),
+  weekStart: z.string().min(1, "Week is required"),
   totalHours: z.coerce.number().min(0.1, "Total hours must be greater than zero"),
 });
 
@@ -70,7 +68,6 @@ export const coOwnerSchema = z.object({
 });
 
 export const managerSchema = coOwnerSchema.extend({
-  pastDaysAllowed: z.coerce.number().min(1, "Minimum is 1 day").max(30, "Maximum is 30 days"),
   payRate: z.coerce.number().min(1, "Pay rate must be greater than zero"),
 });
 

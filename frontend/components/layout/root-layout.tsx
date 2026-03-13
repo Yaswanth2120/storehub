@@ -34,7 +34,7 @@ export function DashboardLayoutShell({
   const title = TITLES[pathname] ?? "StoreHub";
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-transparent">
       <Sidebar role={user.role} />
 
       <Dialog open={open} onOpenChange={setOpen}>
@@ -51,7 +51,7 @@ export function DashboardLayoutShell({
           onMenuClick={() => setOpen(true)}
         />
 
-        <main className="flex-1 p-4 lg:p-8">{children}</main>
+        <main className="flex-1 p-5 lg:p-8">{children}</main>
       </div>
     </div>
   );

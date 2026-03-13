@@ -5,8 +5,17 @@ import { requireRole } from "@/backend/auth";
 import { settingsSchema } from "@/backend/validations";
 
 export async function GET() {
-  await requireRole(["OWNER", "CO_OWNER"]);
-  return NextResponse.json(await getSettings());
+  const user = await requireRole(["OWNER", "CO_OWNER"]);
+  const settings = await getSettings();
+
+  if (user.role === "CO_OWNER") {
+    return NextResponse.json({
+      ...settings,
+      recoveryEmail: "",
+    });
+  }
+
+  return NextResponse.json(settings);
 }
 
 export async function PATCH(request: Request) {

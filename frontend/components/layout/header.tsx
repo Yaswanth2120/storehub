@@ -24,16 +24,24 @@ type HeaderProps = {
 };
 
 export function Header({ title, user, storeCount, onMenuClick }: HeaderProps) {
+  async function handleLogout() {
+    await signOut({ redirect: false });
+
+    if (typeof window !== "undefined") {
+      window.location.assign("/login");
+    }
+  }
+
   return (
-    <header className="sticky top-0 z-30 flex h-20 items-center justify-between border-b bg-white/90 px-4 backdrop-blur lg:px-8">
+    <header className="sticky top-0 z-30 flex h-24 items-center justify-between border-b border-white/70 bg-[#f5f5f7]/85 px-4 backdrop-blur lg:px-8">
       <div className="flex items-center gap-3">
         <Button variant="outline" size="icon" className="lg:hidden" onClick={onMenuClick}>
           <Menu className="h-5 w-5" />
         </Button>
 
         <div>
-          <h1 className="text-xl font-semibold">{title}</h1>
-          <p className="text-sm text-muted-foreground">
+          <h1 className="text-[1.9rem] font-semibold tracking-[-0.03em] text-[#1d1d1f]">{title}</h1>
+          <p className="text-sm text-[#6e6e73]">
             Manage your daily operations and access controls.
           </p>
         </div>
@@ -41,13 +49,15 @@ export function Header({ title, user, storeCount, onMenuClick }: HeaderProps) {
 
       <div className="flex items-center gap-3">
         <div className="hidden text-right sm:block">
-          <p className="text-sm font-semibold">{user.username}</p>
-          <p className="text-xs text-muted-foreground">
+          <p className="text-sm font-semibold text-[#1d1d1f]">{user.username}</p>
+          <p className="text-xs text-[#6e6e73]">
             {storeCount} assigned store(s)
           </p>
         </div>
 
-        <Badge>{ROLE_LABELS[user.role] ?? user.role}</Badge>
+        <Badge className="rounded-full border border-[#d7d7dc] bg-white px-3 py-1 text-[#4f5f8f]">
+          {ROLE_LABELS[user.role] ?? user.role}
+        </Badge>
 
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -60,7 +70,7 @@ export function Header({ title, user, storeCount, onMenuClick }: HeaderProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => signOut({ callbackUrl: "/login" })}>
+            <DropdownMenuItem onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
               Logout
             </DropdownMenuItem>

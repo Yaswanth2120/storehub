@@ -1,7 +1,7 @@
-import { addDays, endOfDay, format, startOfDay, subDays } from "date-fns";
+import { endOfDay, startOfDay } from "date-fns";
 import { aggregatePayrollEntries } from "@/backend/payroll";
 import { prisma } from "@/backend/prisma";
-import { parseDateOnly } from "@/lib/utils";
+import { getCurrentWeekStart, getPayrollPeriodBounds, parseDateOnly } from "@/lib/utils";
 
 export async function getSettings() {
   const settings = await prisma.systemSettings.findFirst();
@@ -202,19 +202,22 @@ export async function getPayrollForUser(
     role: string;
     assignedStores: string[];
   },
-  from?: string,
-  to?: string,
+  options?: {
+    periodType?: "WEEKLY" | "BI_WEEKLY";
+    periodStart?: string;
+    from?: string;
+    to?: string;
+  },
 ) {
-  const start = from
-    ? startOfDay(parseDateOnly(from))
-    : startOfDay(subDays(new Date(), 13));
+  const periodType = options?.periodType ?? "BI_WEEKLY";
+  const defaultPeriodStart = getCurrentWeekStart();
+  const derivedBounds =
+    options?.from && options?.to
+      ? { from: options.from, to: options.to }
+      : getPayrollPeriodBounds(periodType, options?.periodStart ?? defaultPeriodStart);
 
-  const end = to
-    ? endOfDay(parseDateOnly(to))
-    : endOfDay(addDays(start, 13));
-
-  const payPeriodStart = from ?? format(start, "yyyy-MM-dd");
-  const payPeriodEnd = to ?? format(end, "yyyy-MM-dd");
+  const start = startOfDay(parseDateOnly(derivedBounds.from));
+  const end = endOfDay(parseDateOnly(derivedBounds.to));
 
   const entries = await prisma.attendance.findMany({
     where: {
@@ -249,6 +252,6 @@ export async function getPayrollForUser(
 
   return aggregatePayrollEntries(entries).map((row) => ({
     ...row,
-    payPeriod: `${payPeriodStart}|${payPeriodEnd}`,
+    payPeriod: `${derivedBounds.from}|${derivedBounds.to}`,
   }));
 }

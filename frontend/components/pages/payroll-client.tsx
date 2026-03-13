@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Search } from "lucide-react";
+import { CalendarRange, Search } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/frontend/components/ui/card";
 import { Input } from "@/frontend/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/frontend/components/ui/select";
 import { Skeleton } from "@/frontend/components/ui/skeleton";
-import { formatDate } from "@/lib/utils";
+import { WeekRangePicker } from "@/frontend/components/ui/week-range-picker";
+import { cn, formatDate, formatLocalDate, getCurrentWeekStart, getPayrollPeriodBounds, getPayrollPeriodOptions } from "@/lib/utils";
 
 type PayrollRow = {
   workerId: string;
@@ -25,27 +26,7 @@ type PayrollClientProps = {
   payroll: PayrollRow[];
 };
 
-function formatLocalDate(date: Date) {
-  const y = date.getFullYear();
-  const m = String(date.getMonth() + 1).padStart(2, "0");
-  const d = String(date.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-}
-
-function getPreviousSaturday() {
-  const today = new Date();
-  const day = today.getDay();
-  const diff = day >= 6 ? day - 6 : day + 1;
-
-  const prevSaturday = new Date(today);
-  prevSaturday.setDate(today.getDate() - diff);
-
-  return formatLocalDate(prevSaturday);
-}
-
-function getToday() {
-  return formatLocalDate(new Date());
-}
+type PayrollType = "BI_WEEKLY" | "WEEKLY";
 
 function formatHours(hours: number) {
   const wholeHours = Math.floor(hours);
@@ -54,27 +35,26 @@ function formatHours(hours: number) {
 }
 
 export function PayrollClient({ stores, payroll }: PayrollClientProps) {
+  const defaultStart = formatLocalDate(getCurrentWeekStart());
 
   const [rows, setRows] = useState(payroll);
   const [search, setSearch] = useState("");
   const [storeFilter, setStoreFilter] = useState("all");
-
-  const [fromDate, setFromDate] = useState(getPreviousSaturday());
-  const [toDate, setToDate] = useState(getToday());
-
+  const [periodType, setPeriodType] = useState<PayrollType>("BI_WEEKLY");
+  const [periodStart, setPeriodStart] = useState(defaultStart);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
+  const periodOptions = useMemo(() => getPayrollPeriodOptions(periodType, 24), [periodType]);
 
+  useEffect(() => {
     let active = true;
 
     async function loadPayroll() {
-
       setLoading(true);
 
       const params = new URLSearchParams({
-        from: fromDate,
-        to: toDate,
+        periodType,
+        periodStart,
       });
 
       const response = await fetch(`/api/payroll?${params.toString()}`);
@@ -94,169 +74,151 @@ export function PayrollClient({ stores, payroll }: PayrollClientProps) {
     return () => {
       active = false;
     };
+  }, [periodStart, periodType]);
 
-  }, [fromDate, toDate]);
+  const filtered = useMemo(
+    () =>
+      rows.filter((row) => {
+        const matchesSearch = row.workerName.toLowerCase().includes(search.toLowerCase());
+        const matchesStore = storeFilter === "all" || row.storeId === storeFilter;
 
-  const filtered = useMemo(() =>
-    rows.filter((row) => {
-
-      const matchesSearch = row.workerName
-        .toLowerCase()
-        .includes(search.toLowerCase());
-
-      const matchesStore =
-        storeFilter === "all" || row.storeId === storeFilter;
-
-      return matchesSearch && matchesStore;
-
-    }),
-    [rows, search, storeFilter]
+        return matchesSearch && matchesStore;
+      }),
+    [rows, search, storeFilter],
   );
 
-  const payPeriodLabel = `${formatDate(fromDate)} - ${formatDate(toDate)}`;
+  const selectedPeriod = getPayrollPeriodBounds(periodType, periodStart);
+  const payrollTypeLabel = periodType === "BI_WEEKLY" ? "Bi-Weekly" : "Weekly";
 
   return (
-
-    <Card>
-
-      {/* HEADER (same layout as Employees page) */}
-      <CardHeader className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-
-        <div>
-          <CardTitle>Payroll</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Manage payroll and view employee compensation.
-          </p>
-        </div>
-
-        <div className="flex w-full flex-col gap-3 lg:w-auto lg:flex-row lg:flex-nowrap lg:items-center">
-
-          <Select value={storeFilter} onValueChange={setStoreFilter}>
-            <SelectTrigger className="w-full lg:w-[180px]">
-              <SelectValue placeholder="All stores" />
-            </SelectTrigger>
-
-            <SelectContent>
-              <SelectItem value="all">All stores</SelectItem>
-
-              {stores.map((store) => (
-                <SelectItem key={store.id} value={store.id}>
-                  {store.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Input
-            type="date"
-            value={fromDate}
-            max={toDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            className="w-full lg:w-[170px]"
-          />
-
-          <Input
-            type="date"
-            value={toDate}
-            min={fromDate}
-            max={getToday()}
-            onChange={(e) => setToDate(e.target.value)}
-            className="w-full lg:w-[170px]"
-          />
-
-          <div className="relative w-full lg:w-[220px]">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-
-            <Input
-              placeholder="Search employee"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-9"
-            />
+    <div className="space-y-6">
+      <Card className="rounded-[28px] border-white/70 bg-white/85 shadow-card backdrop-blur">
+        <CardHeader className="flex flex-col gap-6 xl:flex-row xl:items-start xl:justify-between">
+          <div className="space-y-2">
+            <CardTitle className="text-[2rem] font-semibold tracking-[-0.03em] text-[#1d1d1f]">
+              Payroll
+            </CardTitle>
+            <p className="max-w-xl text-[15px] leading-6 text-[#6e6e73]">
+              Review payroll by Apple-style weekly periods. Bi-weekly is the default and every total honors
+              actual worked dates, recorded hours, and historical pay changes inside the selected range.
+            </p>
           </div>
 
-        </div>
+          <div className="grid w-full gap-3 lg:grid-cols-4 xl:w-auto">
+            <Select value={periodType} onValueChange={(value) => setPeriodType(value as PayrollType)}>
+              <SelectTrigger className="h-12 rounded-2xl border-[#d2d2d7] bg-[#fbfbfd] text-[#1d1d1f] shadow-none">
+                <SelectValue placeholder="Payroll type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="BI_WEEKLY">Bi-Weekly</SelectItem>
+                <SelectItem value="WEEKLY">Weekly</SelectItem>
+              </SelectContent>
+            </Select>
 
-      </CardHeader>
+            <WeekRangePicker options={periodOptions} value={periodStart} onChange={setPeriodStart} />
 
-      {/* TABLE */}
-      <CardContent className="p-0">
+            <Select value={storeFilter} onValueChange={setStoreFilter}>
+              <SelectTrigger className="h-12 rounded-2xl border-[#d2d2d7] bg-[#fbfbfd] text-[#1d1d1f] shadow-none">
+                <SelectValue placeholder="All stores" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All stores</SelectItem>
+                {stores.map((store) => (
+                  <SelectItem key={store.id} value={store.id}>
+                    {store.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
 
-        <div className="border-b bg-slate-50 px-6 py-3 text-sm font-medium text-slate-600">
-          Pay period: {payPeriodLabel}
-        </div>
+            <div className="relative">
+              <Search className="absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8e8e93]" />
+              <Input
+                placeholder="Search employee"
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                className="h-12 rounded-2xl border-[#d2d2d7] bg-[#fbfbfd] pl-11 shadow-none"
+              />
+            </div>
+          </div>
+        </CardHeader>
 
-        {loading ? (
+        <CardContent className="space-y-5 p-6 pt-0">
+          <div className="flex flex-col gap-3 rounded-[24px] border border-[#e5e5ea] bg-[#f8f8fa] px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="space-y-1">
+              <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#8e8e93]">Payroll Period</p>
+              <p className="text-lg font-medium tracking-[-0.02em] text-[#1d1d1f]">
+                {formatDate(selectedPeriod.from)} - {formatDate(selectedPeriod.to)}
+              </p>
+            </div>
 
-          <div className="space-y-3 p-6">
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
+            <div className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-medium text-[#4f5f8f] shadow-sm">
+              <CalendarRange className="h-4 w-4" />
+              {payrollTypeLabel}
+            </div>
           </div>
 
-        ) : (
+          {loading ? (
+            <div className="space-y-3">
+              <Skeleton className="h-16 w-full rounded-2xl" />
+              <Skeleton className="h-16 w-full rounded-2xl" />
+              <Skeleton className="h-16 w-full rounded-2xl" />
+            </div>
+          ) : (
+            <div className="overflow-x-auto rounded-[24px] border border-[#e5e5ea] bg-white">
+              <table className="min-w-full text-sm">
+                <thead>
+                  <tr className="border-b border-[#ececf1] bg-[#fbfbfd] text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[#8e8e93]">
+                    <th className="px-6 py-4">Worker</th>
+                    <th className="px-6 py-4">Store</th>
+                    <th className="px-6 py-4">Payroll Type</th>
+                    <th className="px-6 py-4">Pay Period</th>
+                    <th className="px-6 py-4">Total Hours</th>
+                    <th className="px-6 py-4">Pay Rate</th>
+                    <th className="px-6 py-4">Total Pay</th>
+                  </tr>
+                </thead>
 
-          <div className="overflow-x-auto">
+                <tbody>
+                  {filtered.map((row, index) => {
+                    const [from, to] = row.payPeriod.split("|");
 
-            <table className="min-w-full text-sm">
+                    return (
+                      <tr
+                        key={`${row.workerId}-${row.storeId}`}
+                        className={cn(
+                          "border-b border-[#f1f1f4] text-[15px] text-[#3a3a3c] transition-colors hover:bg-[#fafafd]",
+                          index === filtered.length - 1 && "border-b-0",
+                        )}
+                      >
+                        <td className="px-6 py-4 font-medium text-[#1d1d1f]">{row.workerName}</td>
+                        <td className="px-6 py-4">{row.storeName}</td>
+                        <td className="px-6 py-4 text-[#6e6e73]">{payrollTypeLabel}</td>
+                        <td className="px-6 py-4 text-[#6e6e73]">
+                          {formatDate(from)} - {formatDate(to)}
+                        </td>
+                        <td className="px-6 py-4">{formatHours(row.totalHours)}</td>
+                        <td className="px-6 py-4">
+                          {row.payRate == null ? "Varies" : `$${row.payRate.toFixed(2)}`}
+                        </td>
+                        <td className="px-6 py-4 font-semibold text-[#1d1d1f]">${row.totalPay.toFixed(2)}</td>
+                      </tr>
+                    );
+                  })}
 
-              <thead className="border-b bg-white text-left text-slate-400 uppercase tracking-wide">
-                <tr>
-                  <th className="px-6 py-4">Worker</th>
-                  <th className="px-6 py-4">Store</th>
-                  <th className="px-6 py-4">Pay Period</th>
-                  <th className="px-6 py-4">Total Hours</th>
-                  <th className="px-6 py-4">Pay Rate</th>
-                  <th className="px-6 py-4">Total Pay</th>
-                </tr>
-              </thead>
-
-              <tbody>
-
-                {filtered.map((row) => {
-
-                  const [from, to] = row.payPeriod.split("|");
-
-                  return (
-
-                    <tr key={`${row.workerId}-${row.storeId}`} className="border-b">
-
-                      <td className="px-6 py-4 font-medium">{row.workerName}</td>
-
-                      <td className="px-6 py-4">{row.storeName}</td>
-
-                      <td className="px-6 py-4">
-                        {formatDate(from)} - {formatDate(to)}
+                  {!filtered.length ? (
+                    <tr>
+                      <td colSpan={7} className="px-6 py-12 text-center text-sm text-[#6e6e73]">
+                        No payroll entries exist for this period and store filter.
                       </td>
-
-                      <td className="px-6 py-4">
-                        {formatHours(row.totalHours)}
-                      </td>
-
-                      <td className="px-6 py-4">
-                        {row.payRate == null ? "Varies" : `$${row.payRate.toFixed(2)}`}
-                      </td>
-
-                      <td className="px-6 py-4 font-semibold">
-                        ${row.totalPay.toFixed(2)}
-                      </td>
-
                     </tr>
-
-                  );
-
-                })}
-
-              </tbody>
-
-            </table>
-
-          </div>
-
-        )}
-
-      </CardContent>
-
-    </Card>
-
+                  ) : null}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }

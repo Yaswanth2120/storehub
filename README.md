@@ -70,7 +70,7 @@ storehub/
 These are loaded by the seed script:
 
 - `owner / owner123`
-- `coowner1 / temp123`
+- `coowner1 / coowner123`
 - `sarah.j / temp123`
 - `michael.c / manager123`
 

@@ -13,6 +13,45 @@ import {
 } from "@/backend/validations";
 import { generateTempPassword } from "@/lib/utils";
 
+async function ensureScopedManagerAccess(sessionUser: { id: string; role: string; assignedStores?: string[] }, targetUserId: string) {
+  const targetUser = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: {
+      id: true,
+      role: true,
+      assignedStores: {
+        select: {
+          storeId: true,
+        },
+      },
+    },
+  });
+
+  if (!targetUser) {
+    return { error: "User not found", status: 404 as const };
+  }
+
+  if (targetUser.role !== "MANAGER") {
+    return { error: "Co-Owners can only manage managers", status: 403 as const };
+  }
+
+  if (sessionUser.role === "CO_OWNER") {
+    const allowedStoreIds = new Set(sessionUser.assignedStores ?? []);
+    const hasOutOfScopeStore = targetUser.assignedStores.some((entry) => !allowedStoreIds.has(entry.storeId));
+
+    if (hasOutOfScopeStore) {
+      return { error: "Manager is outside your assigned store scope", status: 403 as const };
+    }
+  }
+
+  return { targetUser };
+}
+
+function areStoreIdsWithinScope(storeIds: string[], allowedStoreIds: string[]) {
+  const allowed = new Set(allowedStoreIds);
+  return storeIds.every((storeId) => allowed.has(storeId));
+}
+
 export async function GET() {
   await requireRole(["OWNER", "CO_OWNER"]);
 
@@ -26,7 +65,6 @@ export async function GET() {
       id: true,
       username: true,
       role: true,
-      pastDaysAllowed: true,
       payRate: true,
       assignedStores: {
         include: {
@@ -117,6 +155,13 @@ export async function POST(request: Request) {
     );
   }
 
+  if (sessionUser.role === "CO_OWNER" && !areStoreIdsWithinScope(parsed.data.storeIds, sessionUser.assignedStores)) {
+    return NextResponse.json(
+      { error: "Managers can only be assigned to your stores" },
+      { status: 403 }
+    );
+  }
+
   const password = await bcrypt.hash(parsed.data.password, 10);
 
   const user = await prisma.user.create({
@@ -125,7 +170,7 @@ export async function POST(request: Request) {
       password,
       role,
       mustChangePassword: false,
-      pastDaysAllowed: role === "MANAGER" ? body.pastDaysAllowed : null,
+      pastDaysAllowed: null,
       payRate: role === "MANAGER" ? Number(body.payRate) : null,
 
       assignedStores: {
@@ -243,9 +288,17 @@ export async function PATCH(request: Request) {
 
   /* ---------------- ADMIN OPERATIONS ---------------- */
 
-  const sessionUser = await requireRole(["OWNER"]);
+  const sessionUser = await requireRole(["OWNER", "CO_OWNER"]);
 
   if (intent === "reset-password") {
+    if (sessionUser.role === "CO_OWNER") {
+      const scoped = await ensureScopedManagerAccess(sessionUser, body.userId);
+
+      if ("error" in scoped) {
+        return NextResponse.json({ error: scoped.error }, { status: scoped.status });
+      }
+    }
+
     const nextPassword = generateTempPassword();
 
     await prisma.user.update({
@@ -261,6 +314,28 @@ export async function PATCH(request: Request) {
 
   const role = body.role;
 
+  if (sessionUser.role === "CO_OWNER" && role !== "MANAGER") {
+    return NextResponse.json(
+      { error: "Co-Owners can only edit managers" },
+      { status: 403 }
+    );
+  }
+
+  if (sessionUser.role === "CO_OWNER") {
+    const scoped = await ensureScopedManagerAccess(sessionUser, body.userId);
+
+    if ("error" in scoped) {
+      return NextResponse.json({ error: scoped.error }, { status: scoped.status });
+    }
+
+    if (!areStoreIdsWithinScope(body.storeIds ?? [], sessionUser.assignedStores)) {
+      return NextResponse.json(
+        { error: "Managers can only be assigned to your stores" },
+        { status: 403 }
+      );
+    }
+  }
+
   const existingUser =
     role === "MANAGER"
       ? await prisma.user.findUnique({
@@ -273,8 +348,7 @@ export async function PATCH(request: Request) {
     where: { id: body.userId },
     data: {
       username: body.username,
-      pastDaysAllowed:
-        role === "MANAGER" ? Number(body.pastDaysAllowed) : null,
+      pastDaysAllowed: null,
       payRate: role === "MANAGER" ? Number(body.payRate) : null,
 
       assignedStores: {

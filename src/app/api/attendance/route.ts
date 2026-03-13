@@ -1,9 +1,9 @@
-import { differenceInCalendarDays, format, startOfDay } from "date-fns";
+import { format } from "date-fns";
 import { NextResponse } from "next/server";
 import { prisma } from "@/backend/prisma";
 import { requireRole, requireUser } from "@/backend/auth";
 import { attendanceSchema } from "@/backend/validations";
-import { parseDateOnly } from "@/lib/utils";
+import { isDateInManagerAllowedWeeks, parseDateOnly } from "@/lib/utils";
 
 async function userCanAccessStore(userId: string, role: string, storeId: string) {
   if (role === "OWNER") return true;
@@ -18,13 +18,8 @@ async function userCanAccessStore(userId: string, role: string, storeId: string)
   return !!access;
 }
 
-function isAllowedManagerDate(target: Date, pastDaysAllowed: number | null) {
-  if (!pastDaysAllowed) return false;
-
-  const today = startOfDay(new Date());
-  const diff = differenceInCalendarDays(today, startOfDay(target));
-
-  return diff >= 0 && diff <= pastDaysAllowed;
+function isAllowedManagerDate(target: Date) {
+  return isDateInManagerAllowedWeeks(target);
 }
 
 export async function POST(request: Request) {
@@ -45,11 +40,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Store access denied" }, { status: 403 });
   }
 
-  const targetDate = parseDateOnly(parsed.data.date);
+  const targetDate = parseDateOnly(parsed.data.weekStart);
 
-  if (user.role === "MANAGER" && !isAllowedManagerDate(targetDate, user.pastDaysAllowed)) {
+  if (user.role === "MANAGER" && !isAllowedManagerDate(targetDate)) {
     return NextResponse.json(
-      { error: "Attendance date is outside your allowed range" },
+      { error: "Managers can work only inside the two most recent completed weeks" },
       { status: 403 }
     );
   }
@@ -69,14 +64,30 @@ export async function POST(request: Request) {
           })
         )?.payRate ?? 0;
 
+  const duplicate = await prisma.attendance.findFirst({
+    where: {
+      employeeId: parsed.data.workerType === "EMPLOYEE" ? parsed.data.workerId : null,
+      userId: parsed.data.workerType === "MANAGER" ? parsed.data.workerId : null,
+      storeId: parsed.data.storeId,
+      date: targetDate,
+    },
+  });
+
+  if (duplicate) {
+    return NextResponse.json(
+      { error: "Weekly attendance already exists for this worker and store. Edit the existing record instead." },
+      { status: 400 }
+    );
+  }
+
   await prisma.attendance.create({
     data: {
       employeeId: parsed.data.workerType === "EMPLOYEE" ? parsed.data.workerId : null,
       userId: parsed.data.workerType === "MANAGER" ? parsed.data.workerId : null,
       storeId: parsed.data.storeId,
       date: targetDate,
-      clockIn: parsed.data.clockIn,
-      clockOut: parsed.data.clockOut,
+      clockIn: "00:00",
+      clockOut: "00:00",
       totalHours: parsed.data.totalHours,
       payRateSnapshot,
     },
@@ -86,7 +97,7 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
-  const user = await requireRole(["OWNER", "CO_OWNER"]);
+  const user = await requireRole(["OWNER", "CO_OWNER", "MANAGER"]);
   const body = await request.json();
 
   if (!body.attendanceId) {
@@ -102,15 +113,24 @@ export async function PATCH(request: Request) {
     return NextResponse.json({ error: "Store access denied" }, { status: 403 });
   }
 
+  const targetDate = parseDateOnly(body.weekStart);
+
+  if (user.role === "MANAGER" && !isAllowedManagerDate(targetDate)) {
+    return NextResponse.json(
+      { error: "Managers can work only inside the two most recent completed weeks" },
+      { status: 403 }
+    );
+  }
+
   await prisma.attendance.update({
     where: { id: body.attendanceId },
     data: {
       employeeId: body.workerType === "EMPLOYEE" ? body.workerId : null,
       userId: body.workerType === "MANAGER" ? body.workerId : null,
       storeId: body.storeId,
-      date: parseDateOnly(body.date),
-      clockIn: body.clockIn,
-      clockOut: body.clockOut,
+      date: targetDate,
+      clockIn: "00:00",
+      clockOut: "00:00",
       totalHours: Number(body.totalHours),
       payRateSnapshot:
         body.workerType === "MANAGER"
@@ -203,7 +223,7 @@ export async function GET() {
   return NextResponse.json(
     records.map((record) => ({
       ...record,
-      date: format(record.date, "yyyy-MM-dd"),
+      weekStart: format(record.date, "yyyy-MM-dd"),
     }))
   );
 }
