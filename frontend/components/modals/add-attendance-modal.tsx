@@ -54,6 +54,28 @@ function decimalToTime(decimal: number) {
   return `${hours}:${minutes.toString().padStart(2, "0")}`;
 }
 
+function parseWeeklyHoursInput(value: string) {
+  if (!value) {
+    return NaN;
+  }
+
+  const trimmed = value.trim();
+  const match = /^(\d+):([0-5]\d)$/.exec(trimmed);
+
+  if (!match) {
+    return NaN;
+  }
+
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+
+  if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
+    return NaN;
+  }
+
+  return hours + minutes / 60;
+}
+
 export function AddAttendanceModal({
   triggerLabel,
   stores,
@@ -271,13 +293,7 @@ export function AddAttendanceModal({
               className="h-12 rounded-2xl border-[#d2d2d7] bg-[#fbfbfd] shadow-none"
               {...register("totalHours", {
                 setValueAs: (value: string) => {
-                  if (!value) return 0;
-
-                  const [hours, minutes] = value.split(":").map(Number);
-
-                  if (isNaN(hours) || isNaN(minutes)) return NaN;
-
-                  return hours + minutes / 60;
+                  return parseWeeklyHoursInput(value);
                 },
               })}
             />
