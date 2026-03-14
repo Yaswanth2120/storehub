@@ -129,11 +129,14 @@ export function getPayrollPeriodOptions(
   periodType: "WEEKLY" | "BI_WEEKLY",
   count: number,
   startDate = new Date(),
-) {
+)
+{
   const baseWeek = getCurrentWeekStart(startDate);
 
   return Array.from({ length: count }, (_, index) => {
-    const weekStart = subWeeks(baseWeek, index);
+    const offset = periodType === "BI_WEEKLY" ? index * 2 : index;
+
+    const weekStart = subWeeks(baseWeek, offset);
     const bounds = getPayrollPeriodBounds(periodType, weekStart);
 
     return {

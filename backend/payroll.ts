@@ -46,13 +46,21 @@ export function aggregatePayrollEntries(entries: PayrollEntry[]): AggregatedPayr
     const isManager = Boolean(entry.userId);
     const workerId = entry.userId ?? entry.employeeId ?? "";
     const payRate = entry.payRateSnapshot;
-    const workerName = isManager ? entry.user?.username ?? "Unknown worker" : entry.employee?.name ?? "Unknown worker";
+
+    const workerName = isManager
+      ? entry.user?.username ?? "Unknown worker"
+      : entry.employee?.name ?? "Unknown worker";
+
     const key = `${workerId}-${entry.storeId}-${isManager ? "MANAGER" : "EMPLOYEE"}`;
+
+    // 🔹 Payroll-style rounding: round hours BEFORE calculating pay
+    const roundedHours = Number(entry.totalHours.toFixed(2));
+
     const existing = grouped.get(key);
 
     if (existing) {
-      existing.totalHours += entry.totalHours;
-      existing.totalPay += entry.totalHours * payRate;
+      existing.totalHours += roundedHours;
+      existing.totalPay += roundedHours * payRate;
       existing.hasMixedRates = existing.hasMixedRates || existing.payRate !== payRate;
       existing.payRate = payRate;
       continue;
@@ -65,8 +73,8 @@ export function aggregatePayrollEntries(entries: PayrollEntry[]): AggregatedPayr
       storeId: entry.storeId,
       storeName: entry.store.name,
       payRate,
-      totalHours: entry.totalHours,
-      totalPay: entry.totalHours * payRate,
+      totalHours: roundedHours,
+      totalPay: roundedHours * payRate,
       hasMixedRates: false,
     });
   }

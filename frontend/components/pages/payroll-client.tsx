@@ -99,7 +99,7 @@ export function PayrollClient({ stores, payroll }: PayrollClientProps) {
               Payroll
             </CardTitle>
             <p className="max-w-xl text-[15px] leading-6 text-[#6e6e73]">
-              Review payroll by Apple-style weekly periods. Bi-weekly is the default and every total honors
+              Review payroll by weekly periods. Bi-weekly is the default and every total honors
               actual worked dates, recorded hours, and historical pay changes inside the selected range.
             </p>
           </div>
